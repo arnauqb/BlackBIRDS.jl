@@ -51,8 +51,7 @@ function compute_model_loss(posterior_estimator, loss_fn, data, vi_params, loss_
     loss_jacobians = []
     for i in 1:(vi_params.n_samples_per_epoch)
         params = vcat(model_params_values[i, :], loss_params)
-        model_loss, jacobian = DifferentiationInterface.value_and_gradient(
-            loss_aux, vi_params.ad_mode, params)
+        model_loss, jacobian = value_and_gradient(loss_aux, vi_params.ad_mode, params)
         model_jacobian = jacobian[1:(end - length(loss_params))]
         loss_jacobian = jacobian[(end - length(loss_params) + 1):end]
         push!(model_jacobians, model_jacobian)

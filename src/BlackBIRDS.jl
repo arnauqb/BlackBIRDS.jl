@@ -3,12 +3,13 @@ module BlackBIRDS
 using Infiltrator
 
 import ADTypes
-using DifferentiationInterface
-import Enzyme
+import DifferentiationInterface
 import ForwardDiff
 using PyCall
 import Optimisers
 import StatsBase
+import StochasticAD
+import Zygote
 
 # Write your package code here.
 const torch = PyNULL()
@@ -18,6 +19,7 @@ function __init__()
 end
 
 include("types.jl")
+include("diff.jl")
 include("vi.jl")
 
 end

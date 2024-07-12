@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "c1ffaba0865ef1c39ebdd38b7afff9126e38f36e"
+project_hash = "edff6ff4134b7d69d305132af3824b45c7d0bba7"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "7a6b285f217ba92b5b474b783b4c2e8cf8218aaa"
@@ -87,6 +87,12 @@ git-tree-sha1 = "aebf55e6d7795e02ca500a689d326ac979aaf89e"
 uuid = "9718e550-a3fa-408a-8086-8db961cd8217"
 version = "0.1.1"
 
+[[deps.BenchmarkTools]]
+deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "f1dff6729bc61f4d49e140da1af55dcd1ac97b2f"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.5.0"
+
 [[deps.CEnum]]
 git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
@@ -113,6 +119,12 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.ChainRulesOverloadGeneration]]
+deps = ["ChainRulesCore"]
+git-tree-sha1 = "3ea2d5853a4d132aedd294047bab373333e92027"
+uuid = "f51149dc-2911-5acf-81fc-2076a2a81d4f"
+version = "0.1.4"
 
 [[deps.CommonSubexpressions]]
 deps = ["MacroTools", "Test"]
@@ -203,6 +215,12 @@ git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 version = "1.9.1"
 
+[[deps.Dictionaries]]
+deps = ["Indexing", "Random", "Serialization"]
+git-tree-sha1 = "1f3b7b0d321641c1f2e519f7aed77f8e1f6cb133"
+uuid = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
+version = "0.3.29"
+
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
 git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
@@ -270,6 +288,24 @@ version = "0.25.109"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     DensityInterface = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
     Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.DistributionsAD]]
+deps = ["Adapt", "ChainRules", "ChainRulesCore", "Compat", "Distributions", "FillArrays", "LinearAlgebra", "PDMats", "Random", "Requires", "SpecialFunctions", "StaticArrays", "StatsFuns", "ZygoteRules"]
+git-tree-sha1 = "f4dd7727b07b4b7fff5ff4149118ee06e83dfab7"
+uuid = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
+version = "0.6.55"
+
+    [deps.DistributionsAD.extensions]
+    DistributionsADForwardDiffExt = "ForwardDiff"
+    DistributionsADLazyArraysExt = "LazyArrays"
+    DistributionsADReverseDiffExt = "ReverseDiff"
+    DistributionsADTrackerExt = "Tracker"
+
+    [deps.DistributionsAD.weakdeps]
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
 
 [[deps.DocStringExtensions]]
 deps = ["LibGit2"]
@@ -414,6 +450,11 @@ deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "950c3717af761bc3ff906c2e8e52bd83390b6ec2"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
 version = "0.4.14"
+
+[[deps.Indexing]]
+git-tree-sha1 = "ce1566720fd6b19ff3411404d4b977acd4814f9f"
+uuid = "313cdc1a-70c2-5d6a-ae34-0150d3930a38"
+version = "1.1.1"
 
 [[deps.Infiltrator]]
 deps = ["InteractiveUtils", "Markdown", "REPL", "UUIDs"]
@@ -704,6 +745,10 @@ version = "0.2.0"
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
+[[deps.Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+
 [[deps.ProgressLogging]]
 deps = ["Logging", "SHA", "UUIDs"]
 git-tree-sha1 = "80d919dee55b9c50e8d9e2da5eeafff3fe58b539"
@@ -882,6 +927,16 @@ version = "1.3.1"
     [deps.StatsFuns.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
+
+[[deps.StochasticAD]]
+deps = ["ChainRulesCore", "ChainRulesOverloadGeneration", "Dictionaries", "Distributions", "DistributionsAD", "ExprTools", "ForwardDiff", "Functors", "Random"]
+git-tree-sha1 = "9b1a1abbe0619d6929d2e1ef168d4e30ad5de616"
+uuid = "e4facb34-4f7e-4bec-b153-e122c37934ac"
+version = "0.1.26"
+weakdeps = ["Enzyme"]
+
+    [deps.StochasticAD.extensions]
+    StochasticADEnzymeExt = "Enzyme"
 
 [[deps.StructArrays]]
 deps = ["ConstructionBase", "DataAPI", "Tables"]
