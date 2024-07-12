@@ -130,7 +130,8 @@ end
 function init_vi!(posterior_estimator, vi_params, loss_params)
     full_model = (posterior_estimator = get_parameters(posterior_estimator),
         loss_params = loss_params)
-    optim_state = Optimisers.setup(vi_params.optimiser, full_model)
+    optim_state = Optimisers.setup(Optimisers.OptimiserChain(Optimisers.ClipNorm(vi_params.gradient_clipping),
+        vi_params.optimiser), full_model)
     return optim_state
 end
 
