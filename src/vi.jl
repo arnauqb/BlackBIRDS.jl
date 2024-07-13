@@ -16,66 +16,56 @@ function VIParameters(; ad_mode, gradient_clipping, n_epochs, n_samples_per_epoc
         n_samples_regularization, optimiser, w)
 end
 
-function sample(posterior::PyObject, n_samples)
-    return posterior.sample(n_samples)[1]
-end
-
-function logpdf(posterior::PyObject, x)
-    return posterior.log_prob(x)
-end
-
-function sample_and_logpdf(posterior::PyObject, n_samples)
-    return posterior.sample(n_samples)
-end
-
-function compute_kl_divergence(posterior::PyObject, prior, n_samples, w)
-    x, log_p = sample_and_logpdf(posterior, n_samples)
-    log_q = logpdf(prior, x)
-    kl_div = (log_p - log_q).mean()
-    return w * kl_div
-end
-
-get_kl_values(x) = x
-get_kl_values(x::PyObject) = x.data.numpy()[1]
-
-function compute_model_loss(posterior_estimator, loss_fn, data, vi_params, loss_params)
+function compute_model_loss_and_gradient(
+        posterior_samples, loss_fn, data, loss_params, vi_params)
     function loss_aux(params)
         _model_params = params[1:(end - length(loss_params))]
         _loss_params = params[(end - length(loss_params) + 1):end]
         return loss_fn(_model_params, data, _loss_params)
     end
-    model_params = sample(posterior_estimator, vi_params.n_samples_per_epoch)
-    model_params_values = model_params.detach().numpy()
     total_model_loss = 0.0
-    model_jacobians = []
-    loss_jacobians = []
-    for i in 1:(vi_params.n_samples_per_epoch)
-        params = vcat(model_params_values[i, :], loss_params)
+    model_grads = []
+    loss_params_grads = []
+    for i in 1:axes(posterior_samples, 1)
+        params = vcat(posterior_samples[i], loss_params)
         model_loss, jacobian = value_and_gradient(loss_aux, vi_params.ad_mode, params)
         model_jacobian = jacobian[1:(end - length(loss_params))]
-        loss_jacobian = jacobian[(end - length(loss_params) + 1):end]
-        push!(model_jacobians, model_jacobian)
-        push!(loss_jacobians, loss_jacobian)
+        loss_grad = jacobian[(end - length(loss_params) + 1):end]
+        push!(model_grads, model_jacobian)
+        push!(loss_params_grads, loss_grad)
         total_model_loss += model_loss
     end
-    return model_params, total_model_loss / vi_params.n_samples_per_epoch, model_jacobians,
-    loss_jacobians
+    return total_model_loss / length(posterior_samples), model_grads, loss_params_grads
 end
 
-function differentiate_model_loss(model_params, model_loss_jacobians, vi_params)
+function differentiate_model_loss_through_posterior(
+        posterior_estimator, loss_fn, data, vi_params, loss_params)
+    posterior_samples, posterior_samples_grad = value_and_gradient(
+        () -> sample(posterior_estimator, vi_params.n_samples_per_epoch),
+        vi_params.ad_mode, nothing)
+end
+
+function differentiate_model_loss_through_posterior(
+        posterior_estimator::PyObject, loss_fn, data, vi_params, loss_params)
+    posterior_samples = posterior_estimator.sample(vi_params.n_samples_per_epoch)
+    posterior_samples_values = posterior_samples.detach().numpy()
+    total_model_loss, model_grads, loss_params_grads = compute_model_loss_and_gradient(
+        posterior_samples_values, loss_fn, data, loss_params, vi_params)
     to_diff = torch.zeros(1)
     for i in 1:(vi_params.n_samples_per_epoch)
-        jacobian_torch = torch.tensor(model_loss_jacobians[i], dtype=torch.float32)
-        to_diff += torch.matmul(jacobian_torch, py"$model_params[$(i-1), :]")
+        jacobian_torch = torch.tensor(model_grads[i], dtype = torch.float32)
+        to_diff += torch.matmul(jacobian_torch, py"$posterior_samples[$(i-1), :]")
     end
     to_diff = to_diff / vi_params.n_samples_per_epoch
     to_diff.backward()
+    return total_model_loss, [p.grad.numpy() for p in posterior_estimator.parameters()],
+    loss_params_grads
 end
 
 function differentiate_posterior(posterior_estimator::PyObject, model_params,
-        model_loss_jacobians, kl_divergence, vi_params)
+        model_loss_grad, kl_divergence, vi_params)
     differentiate_model_loss(
-        model_params, model_loss_jacobians, vi_params)
+        model_params, model_loss_grad, vi_params)
     kl_divergence.backward()
     return [p.grad.numpy() for p in posterior_estimator.parameters()]
 end
@@ -106,8 +96,7 @@ function step_vi!(
     full_model = (posterior_estimator = get_parameters(posterior_estimator),
         loss_params = loss_params)
 
-    # compute model loss and jacobians
-    model_params, model_loss, model_jacobians, loss_jacobians = compute_model_loss(
+    model_params, model_loss, model_grads, loss_jacobians = compute_model_loss(
         posterior_estimator, loss_fn, data, vi_params, loss_params)
 
     # compute divergence between posterior and prior
@@ -115,10 +104,10 @@ function step_vi!(
         posterior_estimator, prior, vi_params.n_samples_regularization, vi_params.w)
 
     posterior_estimator_grads = differentiate_posterior(
-        posterior_estimator, model_params, model_jacobians, kl_divergence, vi_params)
+        posterior_estimator, model_params, model_grads, kl_divergence, vi_params)
     loss_jacobians = StatsBase.mean(loss_jacobians)
     total_grads = (posterior_estimator = posterior_estimator_grads,
-                   loss_params = loss_jacobians)
+        loss_params = loss_jacobians)
     optim_state, full_model = Optimisers.update(optim_state, full_model, total_grads)
     update_posterior_estimator!(posterior_estimator, full_model.posterior_estimator)
     update_loss_params!(loss_params, full_model.loss_params)
@@ -129,8 +118,10 @@ end
 function init_vi!(posterior_estimator, vi_params, loss_params)
     full_model = (posterior_estimator = get_parameters(posterior_estimator),
         loss_params = loss_params)
-    optim_state = Optimisers.setup(Optimisers.OptimiserChain(Optimisers.ClipNorm(vi_params.gradient_clipping),
-        vi_params.optimiser), full_model)
+    optim_state = Optimisers.setup(
+        Optimisers.OptimiserChain(Optimisers.ClipNorm(vi_params.gradient_clipping),
+            vi_params.optimiser),
+        full_model)
     return optim_state
 end
 
@@ -140,7 +131,7 @@ function run_vi!(loss_fn, posterior_estimator, prior, data, vi_params, loss_para
     kl_loss_hist = Float64[]
     best_loss = Inf
     best_params = nothing
-    for i in 1:vi_params.n_epochs
+    for i in 1:(vi_params.n_epochs)
         model_loss, kl_loss, optim_state = step_vi!(
             loss_fn, data, posterior_estimator, prior, optim_state, vi_params, loss_params)
         total_loss = model_loss + kl_loss
