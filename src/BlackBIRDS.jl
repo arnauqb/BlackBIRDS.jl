@@ -4,16 +4,17 @@ export StochasticModel, AutoStochasticAD, AutoForwardDiff, AutoZygote
 
 using ADTypes
 using AdvancedVI
-import Bijectors
+using Bijectors
 import ChainRulesCore
 using Flux
 import DifferentiationInterface
 using DiffResults
-import Distributions
+using Distributions
 import DistributionsAD
 import DynamicPPL
+import Functors
 import ForwardDiff
-using PyCall
+import LogDensityProblems
 import Optimisers
 using SimpleUnPack
 import StochasticAD
@@ -27,7 +28,8 @@ struct AutoStochasticAD <: ADTypes.AbstractADType
 end
 
 
-# Write your package code here.
+# for python models TODO: write as extension?
+using PyCall
 const torch = PyNULL()
 
 function __init__()
@@ -38,6 +40,7 @@ include("utils.jl")
 include("diff.jl")
 include("losses.jl")
 include("score.jl")
+include("flows.jl")
 include("vi.jl")
 
 # models

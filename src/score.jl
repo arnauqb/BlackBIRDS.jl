@@ -1,3 +1,5 @@
+export ScoreELBO
+
 struct ScoreELBO{EntropyEst <: AdvancedVI.AbstractEntropyEstimator} <:
        AdvancedVI.AbstractVariationalObjective
     entropy::EntropyEst
@@ -13,7 +15,7 @@ end
 
 function estimate_energy_with_samples(prob, samples, samples_logprob)
     a = Base.Fix1(LogDensityProblems.logdensity, prob).(AdvancedVI.eachsample(samples))
-    return mean(ForwardDiff.value.(a) .* (samples_logprob .- mean(a)))
+    return mean(ChainRulesCore.ignore_derivatives(a) .* (samples_logprob .- mean(a)))
 end
 
 function compute_elbo(q, samples, entropy, obj, problem)
