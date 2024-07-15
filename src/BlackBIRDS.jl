@@ -15,10 +15,11 @@ import DynamicPPL
 import Functors
 import ForwardDiff
 import LogDensityProblems
+import MultiKDE
 import Optimisers
 using SimpleUnPack
 import StochasticAD
-import Random
+using Random
 import Zygote
 
 abstract type StochasticModel{L} <: Distributions.ContinuousMultivariateDistribution end

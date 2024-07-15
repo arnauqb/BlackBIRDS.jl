@@ -1,3 +1,4 @@
+##
 import AdvancedVI
 using Bijectors
 using Flux
@@ -10,9 +11,12 @@ using Optimisers
 using BlackBIRDS
 using BlackBIRDS.RandomWalk
 
-rw_model = RandomWalkModel(100, [0.25], L2Loss());
+##
+rw_model = RandomWalkModel(10, [0.25], KDELoss(10));
 
 data = rand(rw_model);
+
+logpdf(rw_model, data)
 
 @model function ppl_model(data, n)
     log_p ~ Normal(0, 1)
@@ -21,15 +25,10 @@ data = rand(rw_model);
     data ~ RandomWalkModel(n, [p], L2Loss())
 end
 
-d = 1
-μ = zeros(d);
-L = Diagonal(ones(d));
-q_old = AdvancedVI.MeanFieldGaussian(μ, L)
-
-q = make_planar_flow(1);
-
+d = 2
+q = make_planar_flow(d, 20);
 q_samples_untrained = rand(q, 10^4)[:];
-optimizer = Optimisers.Adam(1e-3)
+optimizer = Optimisers.AdamW(1e-3)
 prob_model = ppl_model(data, 100)
 q, stats = run_vi(
     model = prob_model,
@@ -40,20 +39,23 @@ q, stats = run_vi(
     gradient_method = "pathwise",
     adtype = AutoZygote(),
     entropy_estimation = AdvancedVI.MonteCarloEntropy()
-)
+);
 
 ## plots
 
 using CairoMakie
 using PairPlots
 
+##
 elbo_vals = [s.elbo for s in stats];
 plot(elbo_vals)
 
-q_samples = rand(q, 10000)[:];
+##
+q_samples = rand(q, 10000)[1, :];
+prior_samples = rand(Normal(0, 1), 10000);
 table = (; log_p = q_samples);
+table_prior = (; log_p = prior_samples);
 table_untrained = (; log_p = q_samples_untrained);
 truths = (; log_p = log10(0.25));
-pairplot(table, table_untrained, PairPlots.Truth(truths))
+pairplot(table, table_prior, PairPlots.Truth(truths))
 
-## flow
