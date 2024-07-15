@@ -254,14 +254,3 @@ myvalues = [true_samples[i,: ] for i in 1:n_dims+1];
 table2 = (;zip(mynames, myvalues)...);
 
 fig = pairplot(table1, table2)
-
-
-using StochasticAD
-using DiffResults
-
-function f(p)
-    return 2 + rand(Bernoulli(p))
-end
-params = [0.5]
-grad_buf = DiffResults.DiffResult(zero(eltype(params)), similar(params))
-

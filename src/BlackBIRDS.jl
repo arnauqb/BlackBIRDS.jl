@@ -2,8 +2,6 @@ module BlackBIRDS
 
 export AutoForwardDiff, AutoZygote, AutoEnzyme
 
-using Infiltrator
-
 import ADTypes
 import DifferentiationInterface
 using DifferentiationInterface: AutoForwardDiff, AutoZygote, AutoEnzyme
@@ -22,10 +20,5 @@ const torch = PyNULL()
 function __init__()
     copy!(torch, pyimport("torch"))
 end
-
-include("types.jl")
-include("diff.jl")
-include("dist.jl")
-include("vi.jl")
 
 end
