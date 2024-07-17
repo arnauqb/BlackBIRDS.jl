@@ -2,88 +2,99 @@ export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_
 
 # wrapper around normflows
 
-struct PyTorchFlow{T} <: Distributions.ContinuousMultivariateDistribution
-    flow::PyObject
-    flat_params::Vector{T}
+struct PyTorchFlow{T, N, M} <: Distributions.ContinuousMultivariateDistribution
+    func_sampler::PyObject
+    func_logpdf::PyObject
+    buffers::NTuple{N, PyObject}
+    indices::Vector{Tuple{Int64, Int64}}
+    params::NTuple{M, PyObject}
+    params_flat::Vector{T}
 end
+Functors.@functor PyTorchFlow (params_flat,)
 
 function PyTorchFlow(flow::PyObject)
-    flat_params = torch.nn.utils.parameters_to_vector(flow.parameters()).numpy()
-    return PyTorchFlow(flow, flat_params)
-end
-
-function make_reconstruct_f(flow)
-    function reconstruct_f(parameters)
-        #py"assign_params_to_flow"(flow.flow, torch.tensor(parameters))
-        return PyTorchFlow(flow.flow, parameters)
-    end
-    return reconstruct_f
-end
-
-function Optimisers.destructure(flow::PyTorchFlow)
-    return flow.flat_params, make_reconstruct_f(flow)
+    func_sampler, func_logpdf, params, buffers = py"deconstruct_flow"(flow)
+    params_flat, indices = py"flatten_params"(params)
+    params_flat = params_flat.numpy()
+    return PyTorchFlow(func_sampler, func_logpdf, buffers, indices, params, params_flat)
 end
 
 function Distributions.rand(dist::PyTorchFlow)
-    @pywith torch.no_grad() begin
-        py"assign_params_to_flow"(dist.flow, torch.tensor(dist.flat_params))
-        return dist.flow.sample(1)[1].numpy()[:]
-    end
+    params = py"recover_flattened"(
+        torch.tensor(dist.params_flat), dist.indices, dist.params)
+    return dist.func_sampler(params, dist.buffers, 1).flatten().numpy()
 end
 Distributions.rand(rng::Random.AbstractRNG, dist::PyTorchFlow) = rand(dist)
 
 function Distributions.rand(dist::PyTorchFlow, n::Int)
-    @pywith torch.no_grad() begin
-        py"assign_params_to_flow"(dist.flow, torch.tensor(dist.flat_params))
-        return dist.flow.sample(n)[1].t().numpy()
-    end
+    params = py"recover_flattened"(
+        torch.tensor(dist.params_flat), dist.indices, dist.params)
+    return dist.func_sampler(params, dist.buffers, n).numpy()
 end
 Distributions.rand(rng::Random.AbstractRNG, dist::PyTorchFlow, n::Int) = rand(dist, n)
 
 function Distributions.logpdf(dist::PyTorchFlow, x::AbstractArray{<:Real})
-    @pywith torch.no_grad() begin
-        py"assign_params_to_flow"(dist.flow, torch.tensor(dist.flat_params))
-        return dist.flow.log_prob(torch.tensor(x).t()).numpy()
-    end
+    params = py"recover_flattened"(
+        torch.tensor(dist.params_flat), dist.indices, dist.params)
+    return dist.func_logpdf(params, dist.buffers, torch.tensor(x)).numpy()
 end
 
-Distributions.logpdf(dist::PyTorchFlow, x::AbstractVector{<:Real}) = logpdf(dist, reshape(x, length(x), 1))
+function Distributions.logpdf(dist::PyTorchFlow, x::AbstractVector{<:Real})
+    logpdf(dist, reshape(x, length(x), 1))[1]
+end
 
 function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow, n::Int64)
-    samples, torch_pullback = py"sample_pullback"(d.flow, torch.tensor(d.flat_params), n)
+    samples, vjp = py"make_vjp_sampler"(
+        d.func_sampler, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, n)
     function rand_pullback(y_tangent)
-        rand_tangent = NoTangent()
-        grad = torch_pullback(torch.tensor(y_tangent))
-        d_tangent = Tangent{PyTorchFlow}(; flow = NoTangent(), flat_params = grad)
-        n_tangent = NoTangent()
-        return rand_tangent, d_tangent, n_tangent
+        grad,  = vjp(torch.tensor(y_tangent))
+        d_tangent = Tangent{PyTorchFlow}(;
+            func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
+            indices = NoTangent(), params = NoTangent(), params_flat = grad.numpy())
+        return NoTangent(), d_tangent, NoTangent()
     end
-    return samples, rand_pullback
+    return samples.numpy(), rand_pullback
 end
 
-function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractMatrix{T}) where {T}
-    lp, torch_pullback = py"logpdf_pullback"(d.flow, torch.tensor(d.flat_params), torch.tensor(x).t())
-    function logpdf_pullback(y_tangent)
-        logpdf_tangent = NoTangent()
-        grad = torch_pullback(torch.tensor(y_tangent))
-        d_tangent = Tangent{PyTorchFlow}(; flow = NoTangent(), flat_params = grad)
-        x_tangent = NoTangent()
-        return logpdf_tangent, d_tangent, x_tangent
+function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow)
+    samples, vjp = py"make_vjp_sampler"(
+        d.func_sampler, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, 1)
+    function rand_pullback(y_tangent)
+        grad,  = vjp(torch.tensor(y_tangent).reshape(-1, 1))
+        d_tangent = Tangent{PyTorchFlow}(;
+            func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
+            indices = NoTangent(), params = NoTangent(), params_flat = grad.numpy())
+        return NoTangent(), d_tangent
     end
-    return lp, logpdf_pullback
+    return samples.numpy()[:], rand_pullback
 end
 
-function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractVector{T}) where {T}
-    lp, torch_pullback = py"logpdf_pullback"(d.flow, torch.tensor(d.flat_params), torch.tensor(x).reshape(1, -1))
-    lp = lp[1]
+function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractVector{<:Real})
+    lps, vjp = py"make_vjp_logpdf"(d.func_logpdf, d.params, torch.tensor(d.params_flat), d.buffers,
+        d.indices, torch.tensor(x).reshape(-1, 1))
     function logpdf_pullback(y_tangent)
-        logpdf_tangent = NoTangent()
-        grad = torch_pullback(torch.tensor(y_tangent).reshape(1))
-        d_tangent = Tangent{PyTorchFlow}(; flow = NoTangent(), flat_params = grad)
-        x_tangent = NoTangent()
-        return logpdf_tangent, d_tangent, x_tangent
+        grad_params, grad_x = vjp(torch.tensor(y_tangent).reshape(1))
+        d_tangent = Tangent{PyTorchFlow}(;
+            func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
+            indices = NoTangent(), params = NoTangent(), params_flat = grad_params.numpy())
+        x_tangent = grad_x.numpy()
+        return NoTangent(), d_tangent, x_tangent
     end
-    return lp, logpdf_pullback
+    return lps.numpy()[1], logpdf_pullback
+end
+
+function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractMatrix{<:Real})
+    lps, vjp = py"make_vjp_logpdf"(
+        d.func_logpdf, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, torch.tensor(x))
+    function logpdf_pullback(y_tangent)
+        grad_params, grad_x = vjp(torch.tensor(y_tangent))
+        d_tangent = Tangent{PyTorchFlow}(;
+            func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
+            indices = NoTangent(), params = NoTangent(), params_flat = grad_params.numpy())
+        x_tangent = grad_x.numpy()
+        return NoTangent(), d_tangent, NoTangent(), x_tangent
+    end
+    return lps.numpy(), logpdf_pullback
 end
 
 function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
