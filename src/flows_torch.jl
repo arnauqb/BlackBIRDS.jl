@@ -47,7 +47,7 @@ function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow, n::Int64)
     samples, vjp = py"make_vjp_sampler"(
         d.func_sampler, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, n)
     function rand_pullback(y_tangent)
-        grad,  = vjp(torch.tensor(y_tangent))
+        grad, = vjp(torch.tensor(y_tangent))
         d_tangent = Tangent{PyTorchFlow}(;
             func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
             indices = NoTangent(), params = NoTangent(), params_flat = grad.numpy())
@@ -60,7 +60,7 @@ function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow)
     samples, vjp = py"make_vjp_sampler"(
         d.func_sampler, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, 1)
     function rand_pullback(y_tangent)
-        grad,  = vjp(torch.tensor(y_tangent).reshape(-1, 1))
+        grad, = vjp(torch.tensor(y_tangent).reshape(-1, 1))
         d_tangent = Tangent{PyTorchFlow}(;
             func_sampler = NoTangent(), func_logpdf = NoTangent(), buffers = NoTangent(),
             indices = NoTangent(), params = NoTangent(), params_flat = grad.numpy())
@@ -70,7 +70,8 @@ function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow)
 end
 
 function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractVector{<:Real})
-    lps, vjp = py"make_vjp_logpdf"(d.func_logpdf, d.params, torch.tensor(d.params_flat), d.buffers,
+    lps, vjp = py"make_vjp_logpdf"(
+        d.func_logpdf, d.params, torch.tensor(d.params_flat), d.buffers,
         d.indices, torch.tensor(x).reshape(-1, 1))
     function logpdf_pullback(y_tangent)
         grad_params, grad_x = vjp(torch.tensor(y_tangent).reshape(1))
@@ -109,12 +110,18 @@ function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
     return PyTorchFlow(flow_py)
 end
 
-function make_masked_affine_autoregressive_flow_torch(dim, n_layers, hidden_dim)
+function make_masked_affine_autoregressive_flow_torch(
+        dim, n_layers, hidden_dim, param_ranges = nothing)
     flows = []
     for i in 1:n_layers
         push!(flows,
             normflows.flows.MaskedAffineAutoregressive(dim, hidden_dim, num_blocks = 2))
         push!(flows, normflows.flows.LULinearPermute(dim))
+    end
+    if param_ranges !== nothing
+        push!(flows,
+            py"Sigmoid"(min_values = torch.tensor(param_ranges[1], dtype=torch.float),
+                max_values = torch.tensor(param_ranges[2], dtype = torch.float)))
     end
     #flows += [Sigmoid(min_values=-3.0 * torch.ones(6), max_values=torch.zeros(6))]
     q0 = normflows.distributions.DiagGaussian(dim)

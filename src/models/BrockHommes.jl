@@ -21,7 +21,7 @@ function Distributions.rand(bh::BrockHommesModel{T}) where {T}
     sigma = 0.04
     r = 1.0
     R = 1.0 + r
-    g = min.(max.(g, 1e-3), 1.0)
+    #g = min.(max.(g, 1e-3), 1.0)
 
     x = zeros(3)
 
