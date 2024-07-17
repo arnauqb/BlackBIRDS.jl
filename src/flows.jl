@@ -1,4 +1,4 @@
-export make_planar_flow, AffineCoupling
+export make_planar_flow, AffineCoupling, make_affine_flow
 
 function MLP_3layer(input_dim::Int, hdims::Int, output_dim::Int; activation=Flux.leakyrelu)
     return Chain(
@@ -78,8 +78,8 @@ end
 
 function make_affine_flow(dim, nlayers, hdims)
     Ls = []
-    for i in 1:nlayers
-        idx = randperm(dim)[1:div(dim, 2)] 
+    for _ in 1:nlayers
+        idx =  randperm(dim)[1:div(dim, 2)] 
         push!(Ls, AffineCoupling(dim, hdims, idx))
     end
     ts = reduce(∘, Ls)
