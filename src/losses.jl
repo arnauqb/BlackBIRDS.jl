@@ -93,7 +93,7 @@ struct GaussianMMDLoss{T} <: AbstractLoss
         end
         sigma = estimate_sigma(y)
         kernel_yy = gaussian_kernel(y, y, sigma)
-        kernel_yy -= I(size(kernel_yy, 1))
+        kernel_yy = kernel_yy - I(size(kernel_yy, 1))
         new{T}(y, sigma, kernel_yy, w)
     end
 end
@@ -103,7 +103,10 @@ function (loss::GaussianMMDLoss)(x::Matrix, y::Matrix)
     ny = size(y, 1)
     kernel_xy = gaussian_kernel(x, loss.y, loss.sigma)
     kernel_xx = gaussian_kernel(x, x, loss.sigma)
-    kernel_xx -= I(size(kernel_xx, 1))
+    kernel_xx = kernel_xx - I(size(kernel_xx, 1))
+    println("kernel_xx = ", kernel_xx)
+    println("kernel_yy = ", loss.kernel_yy)
+    println("kernel_xy = ", kernel_xy)
     loss_value = (
         1 / (nx * (nx - 1)) * sum(kernel_xx) +
         1 / (ny * (ny - 1)) * sum(loss.kernel_yy) -
@@ -126,7 +129,8 @@ function gaussian_kernel(x, y, sigma)
     return kernel_matrix
 end
 
-function Distributions.logpdf(d::StochasticModel{<:GaussianMMDLoss}, y::AbstractArray{<:Real})
+function Distributions.logpdf(
+        d::StochasticModel{<:GaussianMMDLoss}, y::AbstractArray{<:Real})
     x = rand(d)
     if ndims(x) == 1
         x = reshape(x, 1, length(x))

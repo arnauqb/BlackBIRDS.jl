@@ -25,9 +25,10 @@ data = rand(abm_model);
 
 ##
 
+mmd = GaussianMMDLoss(data, 1e-5)
 @model function ppl_model(data, n)
     p ~ MvNormal([0.5, 0.5, 0.5, -0.5], 0.5)
-    data ~ BrockHommesModel(n, p, GaussianMMDLoss(data, 1e-5), time_horizon)
+    data ~ BrockHommesModel(n, p, mmd, time_horizon)
 end
 
 #true_p = [0.25]
