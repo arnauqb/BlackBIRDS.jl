@@ -8,7 +8,6 @@ using Distributions
 using LinearAlgebra
 using Optimisers
 using Zygote
-using IPMeasures
 
 using BlackBIRDS
 using BlackBIRDS.BrockHommes

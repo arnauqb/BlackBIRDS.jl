@@ -93,8 +93,10 @@ version = "0.6.1"
     OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 
 [[deps.AdvancedVI]]
-deps = ["ADTypes", "Accessors", "ChainRulesCore", "DiffResults", "Distributions", "DistributionsAD", "DocStringExtensions", "FillArrays", "Functors", "LinearAlgebra", "LogDensityProblems", "Optimisers", "PDMats", "ProgressMeter", "Random", "Requires", "SimpleUnPack", "StableRNGs", "StatsBase"]
-path = "../AdvancedVI.jl"
+deps = ["ADTypes", "Accessors", "ChainRulesCore", "DiffResults", "Distributions", "DocStringExtensions", "FillArrays", "Functors", "LinearAlgebra", "LogDensityProblems", "Optimisers", "ProgressMeter", "Random", "Requires", "SimpleUnPack", "StatsBase"]
+git-tree-sha1 = "f079970f8e867f6aa61c5b4313b2530a1a915ca9"
+repo-rev = "master"
+repo-url = "https://github.com/TuringLang/AdvancedVI.jl"
 uuid = "b5ca4192-6429-45e5-a2d9-87aec30a685c"
 version = "0.3.0"
 
@@ -103,7 +105,6 @@ version = "0.3.0"
     AdvancedVIEnzymeExt = "Enzyme"
     AdvancedVIForwardDiffExt = "ForwardDiff"
     AdvancedVIReverseDiffExt = "ReverseDiff"
-    AdvancedVIStochasticADExt = "StochasticAD"
     AdvancedVIZygoteExt = "Zygote"
 
     [deps.AdvancedVI.weakdeps]
@@ -111,7 +112,6 @@ version = "0.3.0"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
-    StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.AliasTables]]
