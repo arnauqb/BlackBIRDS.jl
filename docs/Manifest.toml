@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "7fb59785a47e7b285b66765faa30789eb388e7c7"
+project_hash = "69812dc6ebbac62a6f8784ac137b8be7f80ad1f7"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "aa4d425271a914d8c4af6ad9fccb6eb3aec662c7"
@@ -98,20 +98,24 @@ version = "0.6.1"
     OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 
 [[deps.AdvancedVI]]
-deps = ["ADTypes", "Bijectors", "DiffResults", "Distributions", "DistributionsAD", "DocStringExtensions", "ForwardDiff", "LinearAlgebra", "ProgressMeter", "Random", "Requires", "StatsBase", "StatsFuns", "Tracker"]
-git-tree-sha1 = "3e97de1a2ccce08978cd80570d8cbb9ff3f08bd3"
+deps = ["ADTypes", "Accessors", "ChainRulesCore", "DiffResults", "Distributions", "DocStringExtensions", "FillArrays", "Functors", "LinearAlgebra", "LogDensityProblems", "Optimisers", "ProgressMeter", "Random", "Requires", "SimpleUnPack", "StatsBase"]
+git-tree-sha1 = "f079970f8e867f6aa61c5b4313b2530a1a915ca9"
+repo-rev = "master"
+repo-url = "https://github.com/TuringLang/Advancedvi.jl"
 uuid = "b5ca4192-6429-45e5-a2d9-87aec30a685c"
-version = "0.2.6"
+version = "0.3.0"
 
     [deps.AdvancedVI.extensions]
-    AdvancedVIEnzymeExt = ["Enzyme"]
-    AdvancedVIFluxExt = ["Flux"]
-    AdvancedVIReverseDiffExt = ["ReverseDiff"]
-    AdvancedVIZygoteExt = ["Zygote"]
+    AdvancedVIBijectorsExt = "Bijectors"
+    AdvancedVIEnzymeExt = "Enzyme"
+    AdvancedVIForwardDiffExt = "ForwardDiff"
+    AdvancedVIReverseDiffExt = "ReverseDiff"
+    AdvancedVIZygoteExt = "Zygote"
 
     [deps.AdvancedVI.weakdeps]
+    Bijectors = "76274a88-744f-5084-9051-94815aaf08c4"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
-    Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
@@ -1281,16 +1285,6 @@ version = "0.1.7"
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[[deps.Tracker]]
-deps = ["Adapt", "ChainRulesCore", "DiffRules", "ForwardDiff", "Functors", "LinearAlgebra", "LogExpFunctions", "MacroTools", "NNlib", "NaNMath", "Optimisers", "Printf", "Random", "Requires", "SpecialFunctions", "Statistics"]
-git-tree-sha1 = "5158100ed55411867674576788e710a815a0af02"
-uuid = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
-version = "0.2.34"
-weakdeps = ["PDMats"]
-
-    [deps.Tracker.extensions]
-    TrackerPDMatsExt = "PDMats"
 
 [[deps.TranscodingStreams]]
 git-tree-sha1 = "60df3f8126263c0d6b357b9a1017bb94f53e3582"
