@@ -10,8 +10,6 @@ AdvancedVI = "b5ca4192-6429-45e5-a2d9-87aec30a685c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bijectors = "76274a88-744f-5084-9051-94815aaf08c4"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
-DLPack = "53c2dc0f-f7d5-43fd-8906-6c0220547083"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 Distances = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
@@ -22,7 +20,6 @@ Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
 Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
-KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
@@ -34,14 +31,15 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
-[sources]
-AdvancedVI = {url="https://github.com/TuringLang/AdvancedVI.jl", rev="master"}
-
 [compat]
-julia = "1.6.7"
+julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources.AdvancedVI]
+rev = "master"
+url = "https://github.com/TuringLang/AdvancedVI.jl"
 
 [targets]
 test = ["Test"]
