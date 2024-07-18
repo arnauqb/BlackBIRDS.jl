@@ -1,22 +1,35 @@
-export L2Loss, KDELoss
+export MSELoss, KDELoss, LLLoss, GaussianMMDLoss
 
-abstract type Loss end
+using Distances, LinearAlgebra
 
-function (f::Loss)(model::StochasticModel, y)
-    x = rand(model)
-    return f(x, y)
-end
+abstract type AbstractLoss end
 
-struct L2Loss <: Loss end
-
-(::L2Loss)(x, y) = sum((x - y).^2)
-
-function Distributions.logpdf(d::StochasticModel{L}, y::Vector{T}) where {L, T}
+function Distributions.logpdf(d::StochasticModel, y::Vector{<:Real})
     x = rand(d)
-    return -d.loss(x, y) / length(y)^2
+    l = -d.loss(x, y) / d.loss.w
+    return l
 end
 
-struct KDELoss{T, Q} <: Loss
+function Distributions.logpdf(d::StochasticModel, y::Matrix{<:Real})
+    x = rand(d)
+    loss = 0.0
+    for i in axes(y, 2)
+        loss += d.loss(x[:, i], y[:, i]) / d.loss.w
+    end
+    -loss
+end
+
+struct LLLoss <: AbstractLoss end
+
+struct MSELoss
+    w::Float64
+end
+
+(::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
+
+
+
+struct KDELoss{T, Q} <: AbstractLoss
     n_samples::Int64
     kernel::T
     bandwidth::Q
@@ -26,7 +39,7 @@ KDELoss(n_samples, kernel::Distribution) = KDELoss(n_samples, kernel, "auto")
 
 # Silverman's rule of thumb for KDE bandwidth selection
 # taken from KernelDensity.jl
-function silverman_rule(data, alpha=0.9)
+function silverman_rule(data, alpha = 0.9)
     # Determine length of data
     ndata = length(data)
     ndata <= 1 && return alpha
@@ -50,24 +63,92 @@ function silverman_rule(data, alpha=0.9)
     return alpha * width * ndata^(-0.2)
 end
 
-
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::Vector{T}) where {T}
+function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::Vector{<:Real})
     x_samples = rand(d)
-    for _ in 2:d.loss.n_samples
+    for _ in 2:(d.loss.n_samples)
         x = rand(d)
         x_samples = hcat(x_samples, x)
     end
     # assume independence estimate kde for each point
-    logpdf_total = 0.0
+    pdf_total = 0.0
     @assert size(x_samples, 1) == length(y)
     for i in axes(x_samples, 1)
-        bandwidth = ChainRulesCore.@ignore_derivatives silverman_rule(x_samples[i, :])
-        logpdf_t = 0.0
+        if d.loss.bandwidth == "auto"
+            bandwidth = ChainRulesCore.@ignore_derivatives silverman_rule(x_samples[i, :])
+        else
+            bandwidth = d.loss.bandwidth
+        end
+        pdf_t = 0.0
         for j in axes(x_samples, 2)
             dist = Normal(x_samples[i, j], bandwidth)
-            logpdf_t += logpdf(dist, y[j])
+            pdf_t += pdf(dist, y[i])
         end
-        logpdf_total += logpdf_t / d.loss.n_samples / bandwidth
+        pdf_total += pdf_t 
     end
-    return logpdf_total
+    return log(pdf_total / d.loss.n_samples)
+end
+
+## MMD Loss
+#struct MMDLoss
+#    kernel::IPMeasures.AbstractKernel
+#end
+#
+#function (l::MMDLoss)(x, y)
+#    IPMeasures.mmd(l.kernel, x, y)
+#end
+#
+#function (l::MMDLoss)(x::AbstractVector, y::AbstractVector)
+#    l(reshape(x, 1, length(x)), reshape(y, 1, length(y)))
+#end
+
+"""
+    GaussianMMDLoss
+
+Shape expected is (n_features, n_samples)
+"""
+struct GaussianMMDLoss{T} <: AbstractLoss
+    y::Matrix{T}
+    sigma::T
+    kernel_yy::Matrix{T}
+    w::Float64
+
+    function GaussianMMDLoss(y::AbstractArray{T}, w) where {T}
+        sigma = estimate_sigma(y)
+        kernel_yy = gaussian_kernel(y, y, sigma)
+        kernel_yy -= I(size(kernel_yy, 1))
+        new{T}(y, sigma, kernel_yy, w)
+    end
+end
+
+function (loss::GaussianMMDLoss)(x::Matrix, y::Matrix)
+    nx = size(x, 1)
+    ny = size(y, 1)
+    kernel_xy = gaussian_kernel(x, loss.y, loss.sigma)
+    kernel_xx = gaussian_kernel(x, x, loss.sigma)
+    kernel_xx -= I(size(kernel_xx, 1))
+    loss_value = (
+        1 / (nx * (nx - 1)) * sum(kernel_xx) +
+        1 / (ny * (ny - 1)) * sum(loss.kernel_yy) -
+        2 / (nx * ny) * sum(kernel_xy)
+    )
+    return loss_value
+end
+
+function estimate_sigma(y)
+    dist = pairwise(SqEuclidean(), y, y, dims=2)
+    # exclude self distances
+    mask = I(size(dist, 1))
+    dist = dist[.!mask]
+    return sqrt(median(dist))
+end
+
+function gaussian_kernel(x, y, sigma)
+    dist = pairwise(SqEuclidean(), x, y, dims=2)
+    kernel_matrix = @. exp(-(dist) / (2 * sigma^2))
+    return kernel_matrix
+end
+
+function Distributions.logpdf(d::StochasticModel{<:GaussianMMDLoss}, y::Matrix{<:Real})
+    x = rand(d)
+    return -d.loss(x, y) / d.loss.w
 end

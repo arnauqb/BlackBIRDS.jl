@@ -1,3 +1,9 @@
+export drop_gradient
+
+drop_gradient(x) = ChainRulesCore.@ignore_derivatives x
+drop_gradient(x::ForwardDiff.Dual) = ForwardDiff.value(x)
+drop_gradient(x::StochasticAD.StochasticTriple) = StochasticAD.value(x)
+
 function wrap_in_vec_reshape(f, in_size)
     vec_in_length = prod(in_size)
     reshape_inner = Bijectors.Reshape((vec_in_length,), in_size)

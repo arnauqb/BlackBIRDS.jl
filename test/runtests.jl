@@ -2,6 +2,6 @@ using BlackBIRDS
 using Test
 
 @testset "BlackBIRDS.jl" begin
-    include("dist_tests.jl")
+    include("losses_test.jl")
     # Write your tests here.
 end

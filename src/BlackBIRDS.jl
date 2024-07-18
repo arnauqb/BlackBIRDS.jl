@@ -15,19 +15,15 @@ import DynamicPPL
 import Functors
 import ForwardDiff
 import LogDensityProblems
-import MultiKDE
 import Optimisers
 using SimpleUnPack
 import StochasticAD
 using Random
 import Zygote
 
-abstract type StochasticModel{L} <: Distributions.ContinuousMultivariateDistribution end
-
 struct AutoStochasticAD <: ADTypes.AbstractADType
     n_samples::Int64
 end
-
 
 # for python models TODO: write as extension?
 using PyCall
@@ -37,9 +33,10 @@ const normflows = PyNULL()
 function __init__()
     copy!(torch, pyimport("torch"))
     copy!(normflows, pyimport("normflows"))
-    @pyinclude(String(@__DIR__) * "/nf_wrapper.py")
+    @pyinclude(String(@__DIR__)*"/nf_wrapper.py")
 end
 
+include("models/core.jl")
 include("utils.jl")
 include("diff.jl")
 include("losses.jl")
