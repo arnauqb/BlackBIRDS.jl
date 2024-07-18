@@ -3,7 +3,6 @@ import AdvancedVI
 using Bijectors
 using Flux
 using DynamicPPL
-using DistributionsAD
 using Distributions
 using LinearAlgebra
 using Optimisers
@@ -20,7 +19,7 @@ time_horizon = 1
 g2, g3, b2, b3 = 0.9, 0.9, 0.2, -0.2
 p = [g2, g3, b2, b3]
 
-abm_model = BrockHommesModel(n_timesteps, p, KDELoss(10), time_horizon);
+abm_model = BrockHommesModel(n_timesteps, p, MSELoss(1.0), time_horizon);
 data = rand(abm_model);
 
 
@@ -28,7 +27,7 @@ data = rand(abm_model);
 
 @model function ppl_model(data, n)
     p ~ MvNormal([0.5, 0.5, 0.5, -0.5], 0.5)
-    data ~ BrockHommesModel(n, p, KDELoss(10), time_horizon)
+    data ~ BrockHommesModel(n, p, GaussianMMDLoss(data, 1e-5), time_horizon)
 end
 
 #true_p = [0.25]
@@ -47,12 +46,11 @@ end
 ##
 d = 4
 #q = make_masked_affine_autoregressive_flow_torch(d, 8, 32, [-1.0 * ones(4), ones(4)]);
-q = make_masked_affine_autoregressive_flow_torch(d, 8, 16)
+q = make_masked_affine_autoregressive_flow_torch(d, 8, 16);
 #q = make_planar_flow(4, 20)
 q_samples_untrained = rand(q, 10^4);
-optimizer = Optimisers.AdamW(1e-3)
-prob_model = ppl_model(data, n_timesteps)
-
+optimizer = Optimisers.AdamW(1e-3);
+prob_model = ppl_model(data, n_timesteps);
 q, stats = run_vi(
     model = prob_model,
     q = q,

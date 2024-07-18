@@ -4,19 +4,9 @@ using Distances, LinearAlgebra
 
 abstract type AbstractLoss end
 
-function Distributions.logpdf(d::StochasticModel, y::Vector{<:Real})
+function Distributions.logpdf(d::StochasticModel, y)
     x = rand(d)
-    l = -d.loss(x, y) / d.loss.w
-    return l
-end
-
-function Distributions.logpdf(d::StochasticModel, y::Matrix{<:Real})
-    x = rand(d)
-    loss = 0.0
-    for i in axes(y, 2)
-        loss += d.loss(x[:, i], y[:, i]) / d.loss.w
-    end
-    -loss
+    return -d.loss(x, y) / d.loss.w
 end
 
 struct LLLoss <: AbstractLoss end
@@ -26,8 +16,6 @@ struct MSELoss
 end
 
 (::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
-
-
 
 struct KDELoss{T, Q} <: AbstractLoss
     n_samples::Int64
@@ -63,7 +51,7 @@ function silverman_rule(data, alpha = 0.9)
     return alpha * width * ndata^(-0.2)
 end
 
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::Vector{<:Real})
+function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y)
     x_samples = rand(d)
     for _ in 2:(d.loss.n_samples)
         x = rand(d)
@@ -83,28 +71,15 @@ function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::Vector{<:Real})
             dist = Normal(x_samples[i, j], bandwidth)
             pdf_t += pdf(dist, y[i])
         end
-        pdf_total += pdf_t 
+        pdf_total += pdf_t
     end
     return log(pdf_total / d.loss.n_samples)
 end
 
-## MMD Loss
-#struct MMDLoss
-#    kernel::IPMeasures.AbstractKernel
-#end
-#
-#function (l::MMDLoss)(x, y)
-#    IPMeasures.mmd(l.kernel, x, y)
-#end
-#
-#function (l::MMDLoss)(x::AbstractVector, y::AbstractVector)
-#    l(reshape(x, 1, length(x)), reshape(y, 1, length(y)))
-#end
-
 """
     GaussianMMDLoss
 
-Shape expected is (n_features, n_samples)
+Shape expected is (n_features, n_timesteps)
 """
 struct GaussianMMDLoss{T} <: AbstractLoss
     y::Matrix{T}
@@ -113,6 +88,9 @@ struct GaussianMMDLoss{T} <: AbstractLoss
     w::Float64
 
     function GaussianMMDLoss(y::AbstractArray{T}, w) where {T}
+        if ndims(y) == 1
+            y = reshape(y, 1, length(y))
+        end
         sigma = estimate_sigma(y)
         kernel_yy = gaussian_kernel(y, y, sigma)
         kernel_yy -= I(size(kernel_yy, 1))
@@ -135,7 +113,7 @@ function (loss::GaussianMMDLoss)(x::Matrix, y::Matrix)
 end
 
 function estimate_sigma(y)
-    dist = pairwise(SqEuclidean(), y, y, dims=2)
+    dist = pairwise(SqEuclidean(), y, y, dims = 2)
     # exclude self distances
     mask = I(size(dist, 1))
     dist = dist[.!mask]
@@ -143,12 +121,18 @@ function estimate_sigma(y)
 end
 
 function gaussian_kernel(x, y, sigma)
-    dist = pairwise(SqEuclidean(), x, y, dims=2)
+    dist = pairwise(SqEuclidean(), x, y, dims = 2)
     kernel_matrix = @. exp(-(dist) / (2 * sigma^2))
     return kernel_matrix
 end
 
-function Distributions.logpdf(d::StochasticModel{<:GaussianMMDLoss}, y::Matrix{<:Real})
+function Distributions.logpdf(d::StochasticModel{<:GaussianMMDLoss}, y::AbstractArray{<:Real})
     x = rand(d)
+    if ndims(x) == 1
+        x = reshape(x, 1, length(x))
+    end
+    if ndims(y) == 1
+        y = reshape(y, 1, length(y))
+    end
     return -d.loss(x, y) / d.loss.w
 end
