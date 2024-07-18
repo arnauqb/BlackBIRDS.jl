@@ -28,8 +28,15 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        python-version:
+          - '3.8'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: install python dependencies
+        run: pip install torch normflows
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}

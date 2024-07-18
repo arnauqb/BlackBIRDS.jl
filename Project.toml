@@ -32,7 +32,7 @@ StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
-julia = "1.10"
+julia = "1.10.4"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
