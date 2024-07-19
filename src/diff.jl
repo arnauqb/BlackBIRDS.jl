@@ -15,6 +15,10 @@ end
 function value_and_gradient(ad::AutoStochasticAD, model, params)
     n_samples = ad.n_samples
     st_samples = Matrix{Float64}[]
+    function f_aux(x)
+        _, rec_f = Flux.destructure(model)
+        return rand(rec_f(x))
+    end
     for _ in 1:n_samples
         fd = StochasticAD.derivative_estimate(f_aux, params)
         push!(st_samples, hcat(fd...))

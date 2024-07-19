@@ -7,6 +7,7 @@ using Distributions
 using LinearAlgebra
 using Optimisers
 using Zygote
+using CairoMakie
 
 using BlackBIRDS
 using BlackBIRDS.RandomWalk
@@ -29,11 +30,12 @@ fig
     log_p ~ Normal(0, 0.5)
     p = 10 .^ log_p
     p = clamp(p, 0.0, 1.0)
-    data ~ RandomWalkModel(n_timesteps, [p], MSELoss(1.0))
+    data ~ RandomWalkModel(n_timesteps, [p], KDELoss(10))
 end
 
-d = 4
-q = make_masked_affine_autoregressive_flow_torch(d, 4, 16);
+d = 1
+q = make_planar_flow(1, 5) #make_masked_affine_autoregressive_flow_torch(d, 4, 16);
+#q = AdvancedVI.MeanFieldGaussian(zeros(1), Diagonal(ones(1)));
 q_samples_untrained = rand(q, 10^4);
 optimizer = Optimisers.AdamW(1e-3);
 prob_model = ppl_model(data, n_timesteps);
@@ -50,7 +52,6 @@ q, stats = run_vi(
 
 ## plots
 
-using CairoMakie
 using PairPlots
 
 ##
@@ -75,5 +76,5 @@ pairplot(
     PairPlots.Series(table, label="Trained", color=c1, strokecolor=c1),
     PairPlots.Series(table_prior, label="Prior", color=c2, strokecolor=c2),
     PairPlots.Series(table_untrained, label="Untrained", color=c3, strokecolor=c3),
-    PairPlots.Truth(truths, color = "black"),
+    PairPlots.Truth(truths, color = "black", label="Ground truth"),
 )

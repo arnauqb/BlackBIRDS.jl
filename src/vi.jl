@@ -14,7 +14,7 @@ function run_vi(;
     if gradient_method == "pathwise"
         elbo = AdvancedVI.RepGradELBO(n_montecarlo, entropy=entropy_estimation)
     elseif gradient_method == "score"
-        elbo = ScoreELBO(n_montecarlo, entropy=entropy_estimation)
+        elbo = AdvancedVI.ScoreELBO(n_montecarlo, entropy=entropy_estimation)
     else
         error("Gradient method not recognized")
     end

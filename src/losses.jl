@@ -62,12 +62,14 @@ function silverman_rule(data, alpha = 0.9)
     return alpha * width * ndata^(-0.2)
 end
 
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y)
-    x_samples = rand(d)
-    for _ in 2:(d.loss.n_samples)
-        x = rand(d)
-        x_samples = hcat(x_samples, x)
-    end
+function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractArray{<:Real})
+    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:d.loss.n_samples])
+    x_samples = reduce(hcat, x_samples)
+    #x_samples = rand(d)
+    #for _ in 2:(d.loss.n_samples)
+    #    x = rand(d)
+    #    x_samples = hcat(x_samples, x)
+    #end
     # assume independence estimate kde for each point
     pdf_total = 0.0
     @assert size(x_samples, 1) == length(y)
