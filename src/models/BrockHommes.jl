@@ -7,13 +7,14 @@ using Distributions
 using Flux
 using Functors
 
-struct BrockHommesModel{T, L} <: BlackBIRDS.StochasticModel{L}
+struct BrockHommesModel{T, L} <: BlackBIRDS.UnivariateStochasticModel{L}
     n::Int64
     p::Vector{T}
     loss::L
     gradient_horizon::Int64
 end
 @functor BrockHommesModel (p,)
+Base.length(m::BrockHommesModel) = m.n
 
 function compute_u(x, g, b, R)
     t1 = x[end] - R * x[end - 1]

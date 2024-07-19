@@ -4,10 +4,6 @@ using Distances, LinearAlgebra
 
 abstract type AbstractLoss end
 
-function Distributions.logpdf(d::StochasticModel, y)
-    x = rand(d)
-    return -d.loss(x, y) / d.loss.w
-end
 
 struct LLLoss <: AbstractLoss end
 
@@ -16,6 +12,21 @@ struct MSELoss
 end
 
 (::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
+
+function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractVector{<:Real})
+    x = rand(d)
+    return -d.loss(x, y) / d.loss.w
+end
+
+function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<:Real})
+    # assume shape is (n_features, n_timesteps)
+    x = rand(d)
+    loss = 0.0
+    for i in axes(x, 1)
+        loss += d.loss(x[i, :], y[i, :])
+    end
+    return -mean(loss) / d.loss.w
+end
 
 struct KDELoss{T, Q} <: AbstractLoss
     n_samples::Int64
@@ -99,14 +110,11 @@ struct GaussianMMDLoss{T} <: AbstractLoss
 end
 
 function (loss::GaussianMMDLoss)(x::Matrix, y::Matrix)
-    nx = size(x, 1)
-    ny = size(y, 1)
+    nx = size(x, 2)
+    ny = size(y, 2)
     kernel_xy = gaussian_kernel(x, loss.y, loss.sigma)
     kernel_xx = gaussian_kernel(x, x, loss.sigma)
     kernel_xx = kernel_xx - I(size(kernel_xx, 1))
-    println("kernel_xx = ", kernel_xx)
-    println("kernel_yy = ", loss.kernel_yy)
-    println("kernel_xy = ", kernel_xy)
     loss_value = (
         1 / (nx * (nx - 1)) * sum(kernel_xx) +
         1 / (ny * (ny - 1)) * sum(loss.kernel_yy) -

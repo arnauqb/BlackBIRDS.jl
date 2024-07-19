@@ -48,5 +48,6 @@ include("vi.jl")
 # models
 include("models/RandomWalk.jl")
 include("models/BrockHommes.jl")
+include("models/SIRJune.jl")
 
 end

@@ -8,11 +8,12 @@ using Distributions
 using Functors
 import Random
 
-struct RandomWalkModel{T, L} <: BlackBIRDS.StochasticModel{L}
+struct RandomWalkModel{T, L} <: BlackBIRDS.UnivariateStochasticModel{L}
     n::Int64
     p::Vector{T}
     loss::L
 end
+Base.length(m::RandomWalkModel) = m.n
 @functor RandomWalkModel (p,)
 
 function Distributions.rand(rw::RandomWalkModel{T}) where {T}
@@ -24,7 +25,6 @@ function Distributions.rand(rw::RandomWalkModel{T}) where {T}
     end
     return xs
 end
-Distributions.rand(rng::Random.AbstractRNG, rw::RandomWalkModel) = rand(rw)
 
 function ChainRulesCore.rrule(::typeof(rand), d::RandomWalkModel{T}) where {T}
     v, grad = value_and_gradient(AutoStochasticAD(10), d, d.p)
@@ -34,7 +34,7 @@ function ChainRulesCore.rrule(::typeof(rand), d::RandomWalkModel{T}) where {T}
             n = NoTangent(), p = grad' * y_tangent, loss = NoTangent())
         return rand_tangent, d_tangent
     end
-    return rand(d), rand_pullback
+    return v, rand_pullback
 end
 
 end

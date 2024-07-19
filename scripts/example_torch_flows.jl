@@ -22,10 +22,18 @@ p = [g2, g3, b2, b3]
 abm_model = BrockHommesModel(n_timesteps, p, MSELoss(1.0), time_horizon);
 data = rand(abm_model);
 
+##
+
+mmd = GaussianMMDLoss(data, 1)
+abm_model2 = BrockHommesModel(n_timesteps, p, mmd, time_horizon);
+logpdf(abm_model2, data)
+
+v, f = Zygote.pullback(x -> logpdf(x, data), abm_model2)
+f(v)
 
 ##
 
-mmd = GaussianMMDLoss(data, 1e-5)
+mmd = GaussianMMDLoss(data, 1e-3)
 @model function ppl_model(data, n)
     p ~ MvNormal([0.5, 0.5, 0.5, -0.5], 0.5)
     data ~ BrockHommesModel(n, p, mmd, time_horizon)
@@ -57,7 +65,7 @@ q, stats = run_vi(
     q = q,
     optimizer = optimizer,
     n_montecarlo = 10,
-    max_iter = 200,
+    max_iter = 1000,
     gradient_method = "pathwise",
     adtype = AutoZygote(),
     entropy_estimation = AdvancedVI.MonteCarloEntropy(),
