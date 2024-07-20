@@ -13,10 +13,12 @@ using YAML
 using Random
 
 struct SIRJuneModel{T, G, I, S, P, L} <: BlackBIRDS.MultivariateStochasticModel{L}
-    p::Vector{T}
     n::Int64
     graph::G
+    venue_betas::Vector{T}
     venues::Vector{Symbol}
+    gamma::Vector{T}
+    initial_infected::Vector{T}
     infection_type::I
     discrete_sampler::S
     policies::P
@@ -24,7 +26,7 @@ struct SIRJuneModel{T, G, I, S, P, L} <: BlackBIRDS.MultivariateStochasticModel{
     loss::L
 end
 Base.size(m::SIRJuneModel) = (2, m.n)
-@functor SIRJuneModel (p,)
+@functor SIRJuneModel (venue_betas, gamma, initial_infected)
 
 function generate_random_world_graph(
         n_agents, venues, fraction_population_per_venue, number_per_venue)
@@ -46,9 +48,11 @@ function generate_random_world_graph(
 end
 
 function SIRJuneModel(
-        graph, p, n_timesteps, discrete_sampler, loss; policies = DiffSIR.Policies(), delta_t = 1.0)
+        graph, initial_infected, betas, gamma, n_timesteps, discrete_sampler, loss;
+        policies = DiffSIR.Policies(), delta_t = 1.0)
     venues = [k for k in keys(graph.num_nodes) if k != :agent]
-    return SIRJuneModel(p, n_timesteps, graph, venues, DiffSIR.ConstantInfection(),
+    return SIRJuneModel(n_timesteps, graph, betas, venues, [gamma],
+        [initial_infected], DiffSIR.ConstantInfection(),
         discrete_sampler, policies, delta_t, loss)
 end
 
@@ -57,34 +61,38 @@ function SIRJuneModel(config_path::String, loss)
     params = SIRParams(config)
     venues = collect(keys(params.betas_by_venue))
     betas = collect(values(params.betas_by_venue))
-    p = [params.initial_infected, params.gamma, betas...]
-    return SIRJuneModel(p, params.n_timesteps, params.graph, venues,
+    return SIRJuneModel(params.n_timesteps, params.graph, betas, venues,
+        [params.gamma], [params.initial_infected],
         params.infection_type, params.discrete_sampler, params.policies,
         params.delta_t, loss)
 end
 
 function Distributions.rand(sir::SIRJuneModel)
-    initial_infected = sir.p[1]
-    gamma = sir.p[2]
-    betas_per_venue = sir.p[3:end]
+    initial_infected = sir.initial_infected[1]
+    gamma = sir.gamma[1]
+    betas_per_venue = sir.venue_betas
     betas_by_venue = Dict(zip(sir.venues, betas_per_venue))
     results = run_sir(sir.graph, initial_infected, betas_by_venue, gamma, sir.delta_t,
         sir.n, sir.discrete_sampler, sir.infection_type, sir.policies)
     x = Matrix(hcat(results.delta_I_ts, results.delta_R_ts)')
     return x
-    #return reshape(x, 1, 2, sir.n)
 end
 
 function ChainRulesCore.rrule(
         ::typeof(rand), d::SIRJuneModel{T, G, I, S, P, L}) where {
         T, G, I, S <: DiffSIR.SAD, P, L}
-    v, grad = value_and_gradient(AutoStochasticAD(10), d, d.p)
+    v, jacobians = BlackBIRDS.value_and_gradient(AutoStochasticAD(10), d)
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
-        d_tangent = Tangent{SIRJuneModel{T, G, I, S, P, L}}(;
-            n = NoTangent(), p = grad' * y_tangent, graph = NoTangent(), venues = NoTangent(),
-            infection_type = NoTangent(), discrete_sampler = NoTangent(),
-            policies = NoTangent(), delta_t = NoTangent(), loss = NoTangent())
+        jacobian_1 = jacobians[1:(d.n), :]
+        jacobian_2 = jacobians[(d.n + 1):end, :]
+        grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
+        param_names = Flux.trainable(d)
+        for (i, name) in enumerate(param_names)
+            grad_i = grad[i]
+        end
+
+        d_tangent = Tangent{SIRJuneModel{T, G, I, S, P, L}}(;)
         return rand_tangent, d_tangent
     end
     return v, rand_pullback
@@ -93,15 +101,16 @@ end
 function ChainRulesCore.rrule(
         ::typeof(rand), d::SIRJuneModel{T, G, I, S, P, L}) where {
         T, G, I, S, P, L}
-    v, jacobians = BlackBIRDS.value_and_gradient(AutoForwardDiff(), d, d.p)
+    v, jacobians = BlackBIRDS.value_and_gradient(AutoForwardDiff(), d)
+    # jacobian is size (2n, d)
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
-        jacobian_1 = jacobians[1:d.n, :]
-        jacobian_2 = jacobians[d.n+1:end, :]
-        grad = jacobian_1' * y_tangent[1,:] + jacobian_2' * y_tangent[2,:]
+        jacobian_1 = jacobians[1:(d.n), :]
+        jacobian_2 = jacobians[(d.n + 1):end, :]
+        grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
         d_tangent = Tangent{SIRJuneModel{T, G, I, S, P, L}}(;
-            n = NoTangent(), p = grad, graph = NoTangent(), venues = NoTangent(),
-            infection_type = NoTangent(), discrete_sampler = NoTangent(),
+            n = NoTangent(), graph = NoTangent(), venue_betas=grad[], venues = NoTangent(),
+            gamma=grad[], initial_infected=grad[], infection_type = NoTangent(), discrete_sampler = NoTangent(),
             policies = NoTangent(), delta_t = NoTangent(), loss = NoTangent())
         return rand_tangent, d_tangent
     end
