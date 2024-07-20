@@ -93,7 +93,7 @@ version = "0.6.1"
     OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 
 [[deps.AdvancedVI]]
-deps = ["ADTypes", "Accessors", "ChainRulesCore", "DiffResults", "Distributions", "DocStringExtensions", "FillArrays", "Functors", "LinearAlgebra", "LogDensityProblems", "Optimisers", "ProgressMeter", "Random", "Requires", "SimpleUnPack", "StatsBase"]
+deps = ["ADTypes", "Accessors", "ChainRulesCore", "DiffResults", "Distributions", "DistributionsAD", "DocStringExtensions", "FillArrays", "Functors", "LinearAlgebra", "LogDensityProblems", "Optimisers", "PDMats", "ProgressMeter", "Random", "Requires", "SimpleUnPack", "StableRNGs", "StatsBase"]
 path = "../AdvancedVI.jl"
 uuid = "b5ca4192-6429-45e5-a2d9-87aec30a685c"
 version = "0.3.0"
@@ -103,6 +103,7 @@ version = "0.3.0"
     AdvancedVIEnzymeExt = "Enzyme"
     AdvancedVIForwardDiffExt = "ForwardDiff"
     AdvancedVIReverseDiffExt = "ReverseDiff"
+    AdvancedVIStochasticADExt = "StochasticAD"
     AdvancedVIZygoteExt = "Zygote"
 
     [deps.AdvancedVI.weakdeps]
@@ -110,6 +111,7 @@ version = "0.3.0"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
     Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [[deps.AliasTables]]
@@ -652,9 +654,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "Serialization", "Statistics"]
-git-tree-sha1 = "04661708f5301394a1f1be86a07a89e835900db6"
+git-tree-sha1 = "a74c3f1cf56a3dfcdef0605f8cdb7015926aae30"
 uuid = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
-version = "10.2.3"
+version = "10.3.0"
 
 [[deps.GPUArraysCore]]
 deps = ["Adapt"]
@@ -1243,9 +1245,9 @@ version = "0.1.4"
 
 [[deps.ProgressMeter]]
 deps = ["Distributed", "Printf"]
-git-tree-sha1 = "80686d28ecb3ee7fb3ac5371cacaa0d673eb0d4a"
+git-tree-sha1 = "8f6bc219586aef8baf0ff9a5fe16ee9c70cb65e4"
 uuid = "92933f4c-e287-5a05-a399-4b506db050ca"
-version = "1.10.1"
+version = "1.10.2"
 
 [[deps.PtrArrays]]
 git-tree-sha1 = "f011fbb92c4d401059b2212c05c0601b70f8b759"

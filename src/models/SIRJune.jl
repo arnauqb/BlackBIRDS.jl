@@ -7,21 +7,22 @@ using DiffSIR
 using ChainRulesCore
 using DifferentiationInterface
 using Distributions
+using Flux
 using GraphNeuralNetworks
 using Functors
 using YAML
 using Random
 
-struct SIRJuneModel{T, G, I, S, P, L} <: BlackBIRDS.MultivariateStochasticModel{L}
+struct SIRJuneModel{L, S} <: BlackBIRDS.MultivariateStochasticModel{L}
     n::Int64
-    graph::G
-    venue_betas::Vector{T}
+    graph::GraphNeuralNetworks.GNNHeteroGraph
+    venue_betas::Vector{<:Real}
     venues::Vector{Symbol}
-    gamma::Vector{T}
-    initial_infected::Vector{T}
-    infection_type::I
+    gamma::Vector{<:Real}
+    initial_infected::Vector{<:Real}
+    infection_type::DiffSIR.Infection
     discrete_sampler::S
-    policies::P
+    policies::DiffSIR.Policies
     delta_t::Float64
     loss::L
 end
@@ -78,42 +79,35 @@ function Distributions.rand(sir::SIRJuneModel)
     return x
 end
 
-function ChainRulesCore.rrule(
-        ::typeof(rand), d::SIRJuneModel{T, G, I, S, P, L}) where {
-        T, G, I, S <: DiffSIR.SAD, P, L}
-    v, jacobians = BlackBIRDS.value_and_gradient(AutoStochasticAD(10), d)
+function make_pullback(d::SIRJuneModel{L, S}, jacobians) where {L, S}
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
         jacobian_1 = jacobians[1:(d.n), :]
         jacobian_2 = jacobians[(d.n + 1):end, :]
         grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
-        param_names = Flux.trainable(d)
-        for (i, name) in enumerate(param_names)
-            grad_i = grad[i]
+        p_grads = Dict{Symbol, Vector{eltype(grad[1])}}()
+        counter = 1
+        for (key, p) in pairs(Flux.trainable(d))
+            p_grads[key] = grad[counter:(counter + length(p) - 1)]
+            counter += length(p)
         end
-
-        d_tangent = Tangent{SIRJuneModel{T, G, I, S, P, L}}(;)
+        d_tangent = Tangent{SIRJuneModel{L, S}}(; p_grads...)
         return rand_tangent, d_tangent
     end
+    return rand_pullback
+end
+
+function ChainRulesCore.rrule(
+        ::typeof(rand), d::SIRJuneModel{L, S}) where {L, S <: DiffSIR.SAD}
+    v, jacobians = BlackBIRDS.value_and_gradient(AutoStochasticAD(10), d)
+    rand_pullback = make_pullback(d, jacobians)
     return v, rand_pullback
 end
 
 function ChainRulesCore.rrule(
-        ::typeof(rand), d::SIRJuneModel{T, G, I, S, P, L}) where {
-        T, G, I, S, P, L}
+        ::typeof(rand), d::SIRJuneModel{L, S}) where {L, S}
     v, jacobians = BlackBIRDS.value_and_gradient(AutoForwardDiff(), d)
-    # jacobian is size (2n, d)
-    function rand_pullback(y_tangent)
-        rand_tangent = NoTangent()
-        jacobian_1 = jacobians[1:(d.n), :]
-        jacobian_2 = jacobians[(d.n + 1):end, :]
-        grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
-        d_tangent = Tangent{SIRJuneModel{T, G, I, S, P, L}}(;
-            n = NoTangent(), graph = NoTangent(), venue_betas=grad[], venues = NoTangent(),
-            gamma=grad[], initial_infected=grad[], infection_type = NoTangent(), discrete_sampler = NoTangent(),
-            policies = NoTangent(), delta_t = NoTangent(), loss = NoTangent())
-        return rand_tangent, d_tangent
-    end
+    rand_pullback = make_pullback(d, jacobians)
     return v, rand_pullback
 end
 #
