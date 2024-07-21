@@ -84,7 +84,8 @@ function make_pullback(d::SIRJuneModel{L, S}, jacobians) where {L, S}
         rand_tangent = NoTangent()
         jacobian_1 = jacobians[1:(d.n), :]
         jacobian_2 = jacobians[(d.n + 1):end, :]
-        grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
+        #grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
+        grad = jacobian_1' * y_tangent[1, :] + jacobian_2' * y_tangent[2, :] 
         p_grads = Dict{Symbol, Vector{eltype(grad[1])}}()
         counter = 1
         for (key, p) in pairs(Flux.trainable(d))

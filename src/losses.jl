@@ -1,9 +1,8 @@
-export MSELoss, KDELoss, LLLoss, GaussianMMDLoss
+export MSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel
 
 using Distances, LinearAlgebra
 
 abstract type AbstractLoss end
-
 
 struct LLLoss <: AbstractLoss end
 
@@ -28,14 +27,11 @@ function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<
     return -mean(loss) / d.loss.w
 end
 
-struct KDELoss{T, Q} <: AbstractLoss
-    n_samples::Int64
-    kernel::T
-    bandwidth::Q
-end
-KDELoss(n_samples) = KDELoss(n_samples, Normal, "auto")
-KDELoss(n_samples, kernel::Distribution) = KDELoss(n_samples, kernel, "auto")
+abstract type KDEKernel end
 
+struct GaussianKernel{T} <: KDEKernel
+    bw::T
+end
 # Silverman's rule of thumb for KDE bandwidth selection
 # taken from KernelDensity.jl
 function silverman_rule(data, alpha = 0.9)
@@ -62,31 +58,60 @@ function silverman_rule(data, alpha = 0.9)
     return alpha * width * ndata^(-0.2)
 end
 
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractArray{<:Real})
-    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:d.loss.n_samples])
-    x_samples = reduce(hcat, x_samples)
-    #x_samples = rand(d)
-    #for _ in 2:(d.loss.n_samples)
-    #    x = rand(d)
-    #    x_samples = hcat(x_samples, x)
-    #end
-    # assume independence estimate kde for each point
-    pdf_total = 0.0
-    @assert size(x_samples, 1) == length(y)
+struct MMDKernel <: KDEKernel end
+
+struct KDELoss{T} <: AbstractLoss
+    n_samples::Int64
+    kernel::T
+end
+
+function compute_kde_loss(kernel::GaussianKernel, x_samples, y)
+    logpdf_total = 0.0
+    @assert size(x_samples[:, 1]) == size(y)
     for i in axes(x_samples, 1)
-        if d.loss.bandwidth == "auto"
+        if kernel.bw == "auto"
             bandwidth = ChainRulesCore.@ignore_derivatives silverman_rule(x_samples[i, :])
         else
-            bandwidth = d.loss.bandwidth
+            bandwidth = kernel.bw
         end
         pdf_t = 0.0
         for j in axes(x_samples, 2)
             dist = Normal(x_samples[i, j], bandwidth)
             pdf_t += pdf(dist, y[i])
         end
-        pdf_total += pdf_t
+        logpdf_total += log(pdf_t / size(x_samples, 2) + 1e-8)
     end
-    return log(pdf_total / d.loss.n_samples)
+    return logpdf_total
+end
+
+function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractVector{<:Real})
+    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    x_samples = reduce(hcat, x_samples)
+    return compute_kde_loss(d.loss.kernel, x_samples, y)
+end
+
+function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractMatrix{<:Real})
+    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    x_samples = cat(x_samples..., dims = 3)
+    logpdf_total = 0.0
+    for i in axes(x_samples, 1)
+        logpdf_total += compute_kde_loss(d.loss.kernel, x_samples[i, :, :], y[i, :])
+    end
+    return logpdf_total
+end
+
+function Distributions.logpdf(
+        d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractMatrix{<:Real})
+    #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    #x_samples = cat(x_samples..., dims = 3)
+    lps = 0.0 # zeros(d.loss.n_samples)
+    mmd_loss = GaussianMMDLoss(y, 1.0)
+    for i in 1:(d.loss.n_samples)
+        x = rand(d)
+        loss = mmd_loss(x, y)
+        lps += -loss^2 / 5e-3
+    end
+    return lps / d.loss.n_samples
 end
 
 """
@@ -104,7 +129,7 @@ struct GaussianMMDLoss{T} <: AbstractLoss
         if ndims(y) == 1
             y = reshape(y, 1, length(y))
         end
-        sigma = estimate_sigma(y)
+        sigma = ChainRulesCore.@ignore_derivatives estimate_sigma(y)
         kernel_yy = gaussian_kernel(y, y, sigma)
         kernel_yy = kernel_yy - I(size(kernel_yy, 1))
         new{T}(y, sigma, kernel_yy, w)

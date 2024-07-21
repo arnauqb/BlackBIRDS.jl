@@ -111,7 +111,7 @@ function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
 end
 
 function make_masked_affine_autoregressive_flow_torch(
-        dim, n_layers, hidden_dim, param_ranges = nothing)
+        dim, n_layers, hidden_dim; param_ranges = nothing)
     flows = []
     for i in 1:n_layers
         push!(flows,

@@ -27,7 +27,7 @@ function Distributions.rand(rw::RandomWalkModel{T}) where {T}
 end
 
 function ChainRulesCore.rrule(::typeof(rand), d::RandomWalkModel{T}) where {T}
-    v, grad = value_and_gradient(AutoStochasticAD(10), d, d.p)
+    v, grad = value_and_gradient(AutoStochasticAD(10), d)
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
         d_tangent = Tangent{RandomWalkModel{T}}(;
