@@ -44,6 +44,7 @@ include("losses.jl")
 include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
+include("test_gradients.jl")
 
 # models
 include("models/RandomWalk.jl")

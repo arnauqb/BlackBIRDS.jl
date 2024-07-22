@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "b3f3c9e0d2e5180375af511614e6f64dd66f8ffd"
+project_hash = "9ad98d6737ff1c5fb370a91ec8d956db035e5682"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "aa4d425271a914d8c4af6ad9fccb6eb3aec662c7"
@@ -280,6 +280,12 @@ deps = ["ChainRulesCore"]
 git-tree-sha1 = "3ea2d5853a4d132aedd294047bab373333e92027"
 uuid = "f51149dc-2911-5acf-81fc-2076a2a81d4f"
 version = "0.1.4"
+
+[[deps.ChainRulesTestUtils]]
+deps = ["ChainRulesCore", "Compat", "FiniteDifferences", "LinearAlgebra", "Random", "Suppressor", "Test"]
+git-tree-sha1 = "cffe963ae0879e455d74ffd8243348293d72988a"
+uuid = "cdddcdb0-9152-4a09-a978-84456f9df70a"
+version = "1.13.0"
 
 [[deps.ChangesOfVariables]]
 deps = ["LinearAlgebra", "Test"]
@@ -568,6 +574,12 @@ version = "0.28.1"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     ZygoteRules = "700de1a5-db45-46bc-99cf-38207098b444"
 
+[[deps.Einsum]]
+deps = ["Compat"]
+git-tree-sha1 = "4a6b3eee0161c89700b6c1949feae8b851da5494"
+uuid = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
+version = "0.4.1"
+
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
@@ -605,6 +617,12 @@ weakdeps = ["PDMats", "SparseArrays", "Statistics"]
     FillArraysPDMatsExt = "PDMats"
     FillArraysSparseArraysExt = "SparseArrays"
     FillArraysStatisticsExt = "Statistics"
+
+[[deps.FiniteDifferences]]
+deps = ["ChainRulesCore", "LinearAlgebra", "Printf", "Random", "Richardson", "SparseArrays", "StaticArrays"]
+git-tree-sha1 = "06d76c780d657729cf20821fb5832c6cc4dfd0b5"
+uuid = "26cc04aa-876d-5657-8c51-4c34ba976000"
+version = "0.12.32"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -1301,6 +1319,12 @@ git-tree-sha1 = "838a3a4188e2ded87a4f9f184b4b0d78a1e91cb7"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.0"
 
+[[deps.Richardson]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "48f038bfd83344065434089c2a79417f38715c41"
+uuid = "708f8203-808e-40c0-ba2d-98a6953ed40d"
+version = "1.4.2"
+
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
 git-tree-sha1 = "f65dcb5fa46aee0cf9ed6274ccbd597adc49aa7b"
@@ -1519,6 +1543,12 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "7.2.1+1"
+
+[[deps.Suppressor]]
+deps = ["Logging"]
+git-tree-sha1 = "9143c41bd539a8885c79728b9dedb0ce47dc9819"
+uuid = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
+version = "0.2.7"
 
 [[deps.TOML]]
 deps = ["Dates"]

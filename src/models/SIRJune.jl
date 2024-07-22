@@ -7,6 +7,7 @@ using DiffSIR
 using ChainRulesCore
 using DifferentiationInterface
 using Distributions
+using Einsum
 using Flux
 using GraphNeuralNetworks
 using Functors
@@ -82,10 +83,7 @@ end
 function make_pullback(d::SIRJuneModel{L, S}, jacobians) where {L, S}
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
-        jacobian_1 = jacobians[1:(d.n), :]
-        jacobian_2 = jacobians[(d.n + 1):end, :]
-        #grad = y_tangent[1, :]' * jacobian_1 + y_tangent[2, :]' * jacobian_2
-        grad = jacobian_1' * y_tangent[1, :] + jacobian_2' * y_tangent[2, :] 
+        @einsum grad[k] := jacobians[i, j, k] * y_tangent[i, j]
         p_grads = Dict{Symbol, Vector{eltype(grad[1])}}()
         counter = 1
         for (key, p) in pairs(Flux.trainable(d))

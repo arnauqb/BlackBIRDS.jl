@@ -102,15 +102,18 @@ end
 
 function Distributions.logpdf(
         d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractMatrix{<:Real})
-    #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
-    #x_samples = cat(x_samples..., dims = 3)
+    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    x_samples = cat(x_samples..., dims = 3)
     lps = 0.0 # zeros(d.loss.n_samples)
     mmd_loss = GaussianMMDLoss(y, 1.0)
     for i in 1:(d.loss.n_samples)
-        x = rand(d)
+        x = x_samples[:, :, i]
         loss = mmd_loss(x, y)
         lps += -loss^2 / 5e-3
     end
+    #    loss = mmd_loss(x, y)
+    #    lps += -loss^2 / 5e-3
+    #end
     return lps / d.loss.n_samples
 end
 
@@ -153,8 +156,9 @@ end
 function estimate_sigma(y)
     dist = pairwise(SqEuclidean(), y, y, dims = 2)
     # exclude self distances
-    mask = I(size(dist, 1))
-    dist = dist[.!mask]
+    diag = I(size(dist, 1))
+    #dist = dist[.!mask]
+    dist = dist .- dist .* diag
     return sqrt(median(dist))
 end
 

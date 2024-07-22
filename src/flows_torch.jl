@@ -2,13 +2,14 @@ export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_
 
 # wrapper around normflows
 
-struct PyTorchFlow{T, N, M} <: Distributions.ContinuousMultivariateDistribution
+struct PyTorchFlow{T, N, M, B} <: Distributions.ContinuousMultivariateDistribution
     func_sampler::PyObject
     func_logpdf::PyObject
     buffers::NTuple{N, PyObject}
     indices::Vector{Tuple{Int64, Int64}}
     params::NTuple{M, PyObject}
     params_flat::Vector{T}
+    to_constrained::B
 end
 Functors.@functor PyTorchFlow (params_flat,)
 
@@ -43,7 +44,7 @@ function Distributions.logpdf(dist::PyTorchFlow, x::AbstractVector{<:Real})
     logpdf(dist, reshape(x, length(x), 1))[1]
 end
 
-function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow, n::Int64)
+function ChainRulesCore.rrule(::typeof(sample), d::PyTorchFlow, n::Int64)
     samples, vjp = py"make_vjp_sampler"(
         d.func_sampler, d.params, torch.tensor(d.params_flat), d.buffers, d.indices, n)
     function rand_pullback(y_tangent)
