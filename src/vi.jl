@@ -10,6 +10,8 @@ function run_vi(;
         gradient_method = "pathwise",
         entropy_estimation = AdvancedVI.ClosedFormEntropy()
     )
+    bijector_transf = inverse(bijector(model))
+    q_transformed = transformed(q, bijector_transf)
     ℓπ = DynamicPPL.LogDensityFunction(model)
     if gradient_method == "pathwise"
         elbo = AdvancedVI.RepGradELBO(n_montecarlo, entropy=entropy_estimation)
@@ -22,7 +24,7 @@ function run_vi(;
     q, stats, _ = AdvancedVI.optimize(
         ℓπ,
         elbo,
-        q,
+        q_transformed,
         max_iter;
         adtype,
         optimizer = optimizer

@@ -17,7 +17,8 @@ function value_and_gradient(ad::AutoStochasticAD, model::StochasticModel)
         _, rec_f = Flux.destructure(model)
         return rand(rec_f(x))[:]
     end
-    st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(f_aux, params)...)])
+    st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(
+        f_aux, params)...)])
     #for _ in 1:n_samples
     #    fd = StochasticAD.derivative_estimate(f_aux, params)
     #    push!(st_samples, hcat(fd...))

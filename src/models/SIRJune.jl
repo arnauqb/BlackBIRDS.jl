@@ -7,14 +7,13 @@ using DiffSIR
 using ChainRulesCore
 using DifferentiationInterface
 using Distributions
-using Einsum
 using Flux
 using GraphNeuralNetworks
 using Functors
 using YAML
 using Random
 
-struct SIRJuneModel{L, S} <: BlackBIRDS.MultivariateStochasticModel{L}
+struct SIRJuneModel{L, S} <: BlackBIRDS.UnivariateStochasticModel{L}
     n::Int64
     graph::GraphNeuralNetworks.GNNHeteroGraph
     venue_betas::Vector{<:Real}
@@ -27,7 +26,7 @@ struct SIRJuneModel{L, S} <: BlackBIRDS.MultivariateStochasticModel{L}
     delta_t::Float64
     loss::L
 end
-Base.size(m::SIRJuneModel) = (2, m.n)
+Base.length(m::SIRJuneModel) = m.n
 @functor SIRJuneModel (venue_betas, gamma, initial_infected)
 
 function generate_random_world_graph(
@@ -76,14 +75,13 @@ function Distributions.rand(sir::SIRJuneModel)
     betas_by_venue = Dict(zip(sir.venues, betas_per_venue))
     results = run_sir(sir.graph, initial_infected, betas_by_venue, gamma, sir.delta_t,
         sir.n, sir.discrete_sampler, sir.infection_type, sir.policies)
-    x = Matrix(hcat(results.delta_I_ts, results.delta_R_ts)')
-    return x
+    return results.delta_I_ts
 end
 
 function make_pullback(d::SIRJuneModel{L, S}, jacobians) where {L, S}
     function rand_pullback(y_tangent)
         rand_tangent = NoTangent()
-        @einsum grad[k] := jacobians[i, j, k] * y_tangent[i, j]
+        grad  = jacobians' * y_tangent
         p_grads = Dict{Symbol, Vector{eltype(grad[1])}}()
         counter = 1
         for (key, p) in pairs(Flux.trainable(d))

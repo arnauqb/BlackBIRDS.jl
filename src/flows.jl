@@ -1,10 +1,11 @@
 export make_planar_flow, AffineCoupling, make_affine_flow
 
-function MLP_3layer(input_dim::Int, hdims::Int, output_dim::Int; activation=Flux.leakyrelu)
+function MLP_3layer(
+        input_dim::Int, hdims::Int, output_dim::Int; activation = Flux.leakyrelu)
     return Chain(
         Flux.Dense(input_dim, hdims, activation),
         Flux.Dense(hdims, hdims, activation),
-        Flux.Dense(hdims, output_dim),
+        Flux.Dense(hdims, output_dim)
     )
 end
 
@@ -27,12 +28,12 @@ end
 # to apply functions to the parameters that are contained in AffineCoupling.s and AffineCoupling.t,
 # and to re-build the struct from the parameters, we use the functor interface of `Functors.jl`
 # see https://fluxml.ai/Flux.jl/stable/models/functors/#Functors.functor
-@Functors.functor AffineCoupling (s, t)
+Functors.@functor AffineCoupling (s, t)
 
 function AffineCoupling(
-    dim::Int,  # dimension of input
-    hdims::Int, # dimension of hidden units for s and t
-    mask_idx::AbstractVector, # index of dimension that one wants to apply transformations on
+        dim::Int,  # dimension of input
+        hdims::Int, # dimension of hidden units for s and t
+        mask_idx::AbstractVector # index of dimension that one wants to apply transformations on
 )
     cdims = length(mask_idx) # dimension of parts used to construct coupling law
     s = MLP_3layer(cdims, hdims, cdims)
@@ -65,7 +66,7 @@ function Bijectors.with_logabsdet_jacobian(af::AffineCoupling, x::AbstractVector
 end
 
 function Bijectors.with_logabsdet_jacobian(
-    iaf::Inverse{<:AffineCoupling}, y::AbstractVector
+        iaf::Inverse{<:AffineCoupling}, y::AbstractVector
 )
     af = iaf.orig
     # partition vector using `af.mask::PartitionMask`
@@ -79,10 +80,10 @@ end
 function make_affine_flow(dim, nlayers, hdims)
     Ls = []
     for _ in 1:nlayers
-        idx =  randperm(dim)[1:div(dim, 2)] 
+        idx = randperm(dim)[1:div(dim, 2)]
         push!(Ls, AffineCoupling(dim, hdims, idx))
     end
     ts = reduce(∘, Ls)
-    base_dist = DistributionsAD.TuringDiagMvNormal(zeros(dim), ones(dim))
+    base_dist = DistributionsAD.TuringDiagMvNormal(zeros(Float32, dim), ones(Float32, dim))
     return transformed(base_dist, ts)
 end
