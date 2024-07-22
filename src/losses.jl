@@ -13,8 +13,13 @@ end
 (::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
 
 function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractVector{<:Real})
-    x = rand(d)
-    return -d.loss(x, y) / d.loss.w
+    loss = 0.0
+    n_samples = 1
+    for i in 1:n_samples
+        x = rand(d)
+        loss += -d.loss(x, y) / d.loss.w
+    end
+    return loss / n_samples
 end
 
 function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<:Real})
@@ -101,13 +106,15 @@ function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractMatrix{<
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractMatrix{<:Real})
-    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
-    x_samples = cat(x_samples..., dims = 3)
+        d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractVector{<:Real})
+    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)] #fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+
+    x_samples = hcat(x_samples...)
     lps = 0.0 # zeros(d.loss.n_samples)
     mmd_loss = GaussianMMDLoss(y, 1.0)
     for i in 1:(d.loss.n_samples)
-        x = x_samples[:, :, i]
+        x = x_samples[:, i]
         loss = mmd_loss(x, y)
         lps += -loss^2 / 5e-3
     end
@@ -139,7 +146,13 @@ struct GaussianMMDLoss{T} <: AbstractLoss
     end
 end
 
-function (loss::GaussianMMDLoss)(x::Matrix, y::Matrix)
+function (loss::GaussianMMDLoss)(x, y)
+    if ndims(x) == 1
+        x = reshape(x, 1, length(x))
+    end
+    if ndims(y) == 1
+        y = reshape(y, 1, length(y))
+    end
     nx = size(x, 2)
     ny = size(y, 2)
     kernel_xy = gaussian_kernel(x, loss.y, loss.sigma)
@@ -171,11 +184,5 @@ end
 function Distributions.logpdf(
         d::StochasticModel{<:GaussianMMDLoss}, y::AbstractArray{<:Real})
     x = rand(d)
-    if ndims(x) == 1
-        x = reshape(x, 1, length(x))
-    end
-    if ndims(y) == 1
-        y = reshape(y, 1, length(y))
-    end
     return -d.loss(x, y) / d.loss.w
 end
