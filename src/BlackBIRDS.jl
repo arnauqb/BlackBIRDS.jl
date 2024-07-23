@@ -40,15 +40,9 @@ include("models/core.jl")
 include("utils.jl")
 include("diff.jl")
 include("losses.jl")
-#include("score.jl")
 include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
 include("test_gradients.jl")
-
-# models
-include("models/RandomWalk.jl")
-include("models/BrockHommes.jl")
-include("models/SIRJune.jl")
 
 end

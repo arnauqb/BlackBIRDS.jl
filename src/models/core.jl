@@ -1,7 +1,5 @@
 export UnivariateStochasticModel, MultivariateStochasticModel, StochasticModel
 
-using ZygoteRules
-
 abstract type UnivariateStochasticModel{L} <: Distributions.ContinuousMultivariateDistribution end
 abstract type MultivariateStochasticModel{L} <: Distributions.ContinuousMatrixDistribution end
 StochasticModel{L} = Union{UnivariateStochasticModel{L}, MultivariateStochasticModel{L}}
