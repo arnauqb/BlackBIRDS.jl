@@ -17,22 +17,22 @@ using BlackBIRDS
 using BlackBIRDS.SIRJune
 
 ##
-n_agents = 500
-venues = ["household", "company", "school", "leisure"]
-fraction_population_per_venue = [1.0, 0.4, 0.4, 1.0]
-number_per_venue = [1, 1, 1, 1] #Int.(floor.([1 / 5, 1 / 10] .* n_agents)) #, 1 / 10, 1 / 2] .* n_agents))
+n_agents = 100
+venues = ["household"]#, "company", "school", "leisure"]
+fraction_population_per_venue = [1.0]#, 0.4, 0.4, 1.0]
+number_per_venue = [1]#, 1, 1, 1] #Int.(floor.([1 / 5, 1 / 10] .* n_agents)) #, 1 / 10, 1 / 2] .* n_agents))
 graph = generate_random_world_graph(
     n_agents, venues, fraction_population_per_venue, number_per_venue)
-true_initial_infected = 0.01
+true_initial_infected = 0.1
 true_gamma = 0.05
-true_betas = [0.2, 0.2, 0.2, 0.2]
+true_betas = [0.5]#, 0.2, 0.2, 0.2]
 n_timesteps = 30
-#loss = KDELoss(100, BlackBIRDS.MMDKernel())
-loss = MSELoss(1e-4)
+loss = KDELoss(10, BlackBIRDS.MMDKernel())
+#loss = MSELoss(1e-4)
 discrete_sampler = DiffSIR.SM()
 sir = SIRJuneModel(
     graph, true_initial_infected, true_betas, true_gamma, n_timesteps, discrete_sampler, loss);
-@functor SIRJuneModel (venue_betas,)
+@functor SIRJuneModel (initial_infected, venue_betas, gamma)
 
 ##
 
@@ -49,16 +49,17 @@ fig
         data, true_initial_infected, true_gamma, n_timesteps, graph, discrete_sampler, loss)
     #betas ~ filldist(LogNormal(-1, 0.25), 4)
     #betas ~ filldist(LogNormal(-1, 0.25), 4)
-    betas ~ filldist(Uniform(0, 1), 4)
+    #p ~ filldist(Uniform(0, 1), 6)
+    p ~ Uniform(0, 1)
     #log_betas ~ MvNormal(-0.75 * ones(4), 1.0)
     #betas = 10 .^ log_betas
     data ~ SIRJuneModel(
-        graph, true_initial_infected, betas, true_gamma, n_timesteps, discrete_sampler, loss)
+        graph, true_initial_infected, [p], true_gamma, n_timesteps, discrete_sampler, loss)
 end
-d = 4
+d = 1
 #q = make_masked_affine_autoregressive_flow_torch(d, 4, 16);
-μ  = -0.4 * ones(d) #randn(d);
-L  = LowerTriangular(Diagonal(0.25 .* ones(d)));
+μ = -0.4 * ones(d) #randn(d);
+L = LowerTriangular(Diagonal(0.25 .* ones(d)));
 q = AdvancedVI.FullRankGaussian(μ, L)
 #q = make_planar_flow(d, 5)
 #q = make_affine_flow(d, 4, 16);
@@ -73,7 +74,7 @@ q, stats = run_vi(
     q = q,
     optimizer = optimizer,
     n_montecarlo = 10,
-    max_iter = 250,
+    max_iter = 1000,
     gradient_method = "pathwise",
     adtype = AutoZygote(),
     entropy_estimation = AdvancedVI.MonteCarloEntropy()
@@ -89,11 +90,11 @@ fig
 using PyCall
 pygtc = pyimport("pygtc")
 q_samples = rand(q, 10000)
-prior_samples = rand(Uniform(0, 1), (4, 10000))
+prior_samples = rand(Uniform(0, 1), (1, 10000))
 #prior = MvNormal(-0.75 * ones(4), 1.0)
 #prior_samples = rand(prior, 10000)
 pygtc.plotGTC([q_samples', prior_samples'], #, q_samples_untrained'],
-    figureSize = 7, truths = [true_betas...],
+    figureSize = 7, truths = [true_betas...],#[true_initial_infected, true_betas..., true_gamma],
     chainLabels = ["flow", "prior"])
 
 ##
@@ -104,7 +105,7 @@ pygtc.plotGTC([q_samples', prior_samples],
 ##
 prior_samples = rand(LogNormal(-2, 0.5), (4, 10000))
 pygtc.plotGTC([prior_samples'],
-    figureSize = 5, 
+    figureSize = 5,
     chainLabels = ["prior"])
 
 ##

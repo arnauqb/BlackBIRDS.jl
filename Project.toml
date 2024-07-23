@@ -47,7 +47,12 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources.AdvancedVI]
 rev = "master"
-url = "https://github.com/TuringLang/AdvancedVI.jl"
+url = "https://github.com/arnauqb/AdvancedVI.jl"
+
+[sources.DiffSIR]
+rev = "main"
+url = "https://github.com/arnauqb/DiffSIR.jl"
+
 
 [targets]
 test = ["Test"]

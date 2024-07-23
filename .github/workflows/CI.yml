@@ -67,7 +67,8 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Pkg
-          Pkg.add("https://github.com/TuringLang/AdvancedVI.jl")
+          Pkg.add("https://github.com/arnauqb/AdvancedVI.jl")
+          Pkg.add("https://github.com/arnauqb/DiffSIR.jl")
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1

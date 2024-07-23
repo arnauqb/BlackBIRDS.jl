@@ -13,13 +13,8 @@ end
 (::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
 
 function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractVector{<:Real})
-    loss = 0.0
-    n_samples = 1
-    for i in 1:n_samples
-        x = rand(d)
-        loss += -d.loss(x, y) / d.loss.w
-    end
-    return loss / n_samples
+    x = rand(d)
+    return -d.loss(x, y) / d.loss.w
 end
 
 function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<:Real})
@@ -29,7 +24,7 @@ function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<
     for i in axes(x, 1)
         loss += d.loss(x[i, :], y[i, :])
     end
-    return -mean(loss) / d.loss.w
+    return -loss / d.loss.w / size(x, 1)
 end
 
 abstract type KDEKernel end
@@ -107,7 +102,7 @@ end
 
 function Distributions.logpdf(
         d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractVector{<:Real})
-    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)] #fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)] 
     #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
 
     x_samples = hcat(x_samples...)
@@ -118,9 +113,6 @@ function Distributions.logpdf(
         loss = mmd_loss(x, y)
         lps += -loss^2 / 5e-3
     end
-    #    loss = mmd_loss(x, y)
-    #    lps += -loss^2 / 5e-3
-    #end
     return lps / d.loss.n_samples
 end
 
@@ -170,7 +162,6 @@ function estimate_sigma(y)
     dist = pairwise(SqEuclidean(), y, y, dims = 2)
     # exclude self distances
     diag = I(size(dist, 1))
-    #dist = dist[.!mask]
     dist = dist .- dist .* diag
     return sqrt(median(dist))
 end
