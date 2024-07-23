@@ -47,9 +47,9 @@ version = "0.4.5"
 
 [[deps.Accessors]]
 deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "LinearAlgebra", "MacroTools", "Markdown", "Test"]
-git-tree-sha1 = "c0d491ef0b135fd7d63cbc6404286bc633329425"
+git-tree-sha1 = "f61b15be1d76846c0ce31d3fcfac5380ae53db6a"
 uuid = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
-version = "0.1.36"
+version = "0.1.37"
 
     [deps.Accessors.extensions]
     AccessorsAxisKeysExt = "AxisKeys"
@@ -364,9 +364,9 @@ version = "0.1.2"
 
 [[deps.ConstructionBase]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "260fd2400ed2dab602a7c15cf10c1933c59930a2"
+git-tree-sha1 = "d8a9c0b6ac2d9081bf76324b39c78ca3ce4f0c98"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
-version = "1.5.5"
+version = "1.5.6"
 
     [deps.ConstructionBase.extensions]
     ConstructionBaseIntervalSetsExt = "IntervalSets"
@@ -450,7 +450,9 @@ version = "1.15.1"
 
 [[deps.DiffSIR]]
 deps = ["ChainRulesCore", "DiffResults", "Distributed", "Distributions", "Flux", "ForwardDiff", "GraphNeuralNetworks", "Graphs", "GumbelSoftmax", "HDF5", "JET", "JLD2", "NNlib", "Random", "SpecialFunctions", "StaticArrays", "Statistics", "StochasticAD", "YAML", "Zygote", "cuDNN"]
-path = "../DiffSIR.jl"
+git-tree-sha1 = "7951a358cc8105f8a99367619c199d5a70dd0cc9"
+repo-rev = "main"
+repo-url = "https://github.com/arnauqb/DiffSIR.jl.git"
 uuid = "c9d362b1-baac-488b-bae8-5c4cf13e77ce"
 version = "1.0.0-DEV"
 
@@ -1090,9 +1092,9 @@ version = "2023.1.10"
 
 [[deps.NNlib]]
 deps = ["Adapt", "Atomix", "ChainRulesCore", "GPUArraysCore", "KernelAbstractions", "LinearAlgebra", "Pkg", "Random", "Requires", "Statistics"]
-git-tree-sha1 = "333cd68c28bb57ac23c50acd1036ecd7dd78bf57"
+git-tree-sha1 = "190dcada8cf9520198058c4544862b1f88c6c577"
 uuid = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
-version = "0.9.20"
+version = "0.9.21"
 
     [deps.NNlib.extensions]
     NNlibAMDGPUExt = "AMDGPU"
@@ -1333,9 +1335,9 @@ version = "0.4.2+0"
 
 [[deps.Roots]]
 deps = ["Accessors", "ChainRulesCore", "CommonSolve", "Printf"]
-git-tree-sha1 = "1ab580704784260ee5f45bffac810b152922747b"
+git-tree-sha1 = "3484138c9fa4296a0cf46a74ca3f97b59d12b1d0"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.1.5"
+version = "2.1.6"
 
     [deps.Roots.extensions]
     RootsForwardDiffExt = "ForwardDiff"
@@ -1593,9 +1595,9 @@ weakdeps = ["PDMats"]
     TrackerPDMatsExt = "PDMats"
 
 [[deps.TranscodingStreams]]
-git-tree-sha1 = "60df3f8126263c0d6b357b9a1017bb94f53e3582"
+git-tree-sha1 = "96612ac5365777520c3c5396314c8cf7408f436a"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.11.0"
+version = "0.11.1"
 weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]

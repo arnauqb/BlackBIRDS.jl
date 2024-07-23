@@ -53,6 +53,5 @@ url = "https://github.com/arnauqb/AdvancedVI.jl"
 rev = "main"
 url = "https://github.com/arnauqb/DiffSIR.jl"
 
-
 [targets]
 test = ["Test"]
