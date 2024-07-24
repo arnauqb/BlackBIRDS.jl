@@ -5,7 +5,7 @@ function value_and_gradient(ad::ADTypes.AbstractADType, model::StochasticModel)
     f_to_diff(x) = rand(rec(x))
     value, jacobian = DifferentiationInterface.value_and_jacobian(f_to_diff, ad, params)
     # resize to match the model's output
-    jacobian = reshape(jacobian, size(model)..., :)
+    #jacobian = reshape(jacobian, size(model)..., :)
     return value, jacobian
 end
 
@@ -18,13 +18,9 @@ function value_and_gradient(ad::AutoStochasticAD, model::StochasticModel)
         return rand(rec_f(x))[:]
     end
     st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(
-        f_aux, params)...)])
-    #for _ in 1:n_samples
-    #    fd = StochasticAD.derivative_estimate(f_aux, params)
-    #    push!(st_samples, hcat(fd...))
-    #end
+        f_aux, params)...) for _ in 1:n_samples])
     value = rand(model)
     jacobian = sum(st_samples) / n_samples
-    jacobian = reshape(jacobian, size(model)..., :)
+    #jacobian = reshape(jacobian, size(model)..., :)
     return value, jacobian
 end

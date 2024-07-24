@@ -116,12 +116,6 @@ function make_masked_affine_autoregressive_flow_torch(
             normflows.flows.MaskedAffineAutoregressive(dim, hidden_dim, num_blocks = 2))
         push!(flows, normflows.flows.LULinearPermute(dim))
     end
-    #if param_ranges !== nothing
-    #    push!(flows,
-    #        py"Sigmoid"(min_values = torch.tensor(param_ranges[1], dtype = torch.float),
-    #            max_values = torch.tensor(param_ranges[2], dtype = torch.float)))
-    #end
-    #flows += [Sigmoid(min_values=-3.0 * torch.ones(6), max_values=torch.zeros(6))]
     q0 = normflows.distributions.DiagGaussian(dim)
     nfm = normflows.NormalizingFlow(q0 = q0, flows = flows)
     # remove the gradient from the parameters

@@ -3,7 +3,7 @@ using Distributions
 using BlackBIRDS
 using LinearAlgebra
 
-struct TestModel{L} <: UnivariateStochasticModel{L}
+struct TestModel{L} <: StochasticModel{B, L}
     loss::L
 end
 

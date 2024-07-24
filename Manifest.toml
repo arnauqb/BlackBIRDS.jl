@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "f6cf778606d334f768a7b0cfcafee5dc3580091c"
+project_hash = "1ed980a43142dcd8d42149fde1662dbe8ca586f0"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "aa4d425271a914d8c4af6ad9fccb6eb3aec662c7"
@@ -437,6 +437,12 @@ deps = ["Indexing", "Random", "Serialization"]
 git-tree-sha1 = "1f3b7b0d321641c1f2e519f7aed77f8e1f6cb133"
 uuid = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 version = "0.3.29"
+
+[[deps.DiffABM]]
+deps = ["ChainRulesCore", "DiffResults", "Distributions", "Flux", "ForwardDiff", "Functors", "GraphNeuralNetworks", "GumbelSoftmax", "OffsetArrays", "Random", "StaticArrays", "StochasticAD", "Zygote"]
+path = "../DiffABM.jl"
+uuid = "f2f60c34-395c-4859-8b28-bd94254cb891"
+version = "1.0.0-DEV"
 
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]
@@ -1145,6 +1151,15 @@ version = "0.4.18"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.OffsetArrays]]
+git-tree-sha1 = "1a27764e945a152f7ca7efa04de513d473e9542e"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.14.1"
+weakdeps = ["Adapt"]
+
+    [deps.OffsetArrays.extensions]
+    OffsetArraysAdaptExt = "Adapt"
 
 [[deps.OneHotArrays]]
 deps = ["Adapt", "ChainRulesCore", "Compat", "GPUArraysCore", "LinearAlgebra", "NNlib"]

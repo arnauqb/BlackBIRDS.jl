@@ -6,6 +6,7 @@ using ADTypes
 using AdvancedVI
 using Bijectors
 using ChainRulesCore
+using DiffABM # TODO: make an extension
 using Flux
 import DifferentiationInterface
 using DiffResults
@@ -36,7 +37,9 @@ function __init__()
     @pyinclude(String(@__DIR__)*"/nf_wrapper.py")
 end
 
-include("models/core.jl")
+abstract type StochasticModel{B, L} end
+
+#include("models/core.jl")
 include("utils.jl")
 include("diff.jl")
 include("losses.jl")
@@ -44,5 +47,11 @@ include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
 include("test_gradients.jl")
+
+# models
+#include("models/RandomWalk.jl")
+#include("models/BrockHommes.jl")
+#include("models/SIRJune.jl")
+include("abms.jl")
 
 end
