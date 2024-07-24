@@ -12,12 +12,14 @@ end
 
 (::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
 
-function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractVector{<:Real})
+function Distributions.logpdf(
+        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {B, L <: MSELoss}
     x = rand(d)
     return -d.loss(x, y) / d.loss.w
 end
 
-function Distributions.logpdf(d::StochasticModel{<:MSELoss}, y::AbstractMatrix{<:Real})
+function Distributions.logpdf(
+        d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {B, L <: MSELoss}
     # assume shape is (n_features, n_timesteps)
     x = rand(d)
     loss = 0.0
@@ -84,13 +86,15 @@ function compute_kde_loss(kernel::GaussianKernel, x_samples, y)
     return logpdf_total
 end
 
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractVector{<:Real})
+function Distributions.logpdf(
+        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {B, L <: KDELoss}
     x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
     x_samples = reduce(hcat, x_samples)
     return compute_kde_loss(d.loss.kernel, x_samples, y)
 end
 
-function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractMatrix{<:Real})
+function Distributions.logpdf(
+        d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {B, L <: KDELoss}
     x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
     x_samples = cat(x_samples..., dims = 3)
     logpdf_total = 0.0
@@ -101,8 +105,9 @@ function Distributions.logpdf(d::StochasticModel{<:KDELoss}, y::AbstractMatrix{<
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{<:KDELoss{<:MMDKernel}}, y::AbstractVector{<:Real})
-    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)] 
+        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {
+        B, L <: KDELoss{<:MMDKernel}}
+    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)]
     #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
 
     x_samples = hcat(x_samples...)
@@ -173,7 +178,7 @@ function gaussian_kernel(x, y, sigma)
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{<:GaussianMMDLoss}, y::AbstractArray{<:Real})
+        d::StochasticModel{B, L}, y::AbstractArray{<:Real}) where {B, L <: GaussianMMDLoss}
     x = rand(d)
     return -d.loss(x, y) / d.loss.w
 end
