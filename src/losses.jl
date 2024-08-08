@@ -113,12 +113,13 @@ function Distributions.logpdf(
     x_samples = hcat(x_samples...)
     lps = 0.0 # zeros(d.loss.n_samples)
     mmd_loss = GaussianMMDLoss(y, 1.0)
+    epsilon = 1e-3
     for i in 1:(d.loss.n_samples)
         x = x_samples[:, i]
         loss = mmd_loss(x, y)
-        lps += -loss^2 / 5e-3
+        lps += exp(-loss^2 / epsilon)
     end
-    return lps / d.loss.n_samples
+    return log(lps / d.loss.n_samples)
 end
 
 """

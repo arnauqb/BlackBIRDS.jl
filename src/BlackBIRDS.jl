@@ -39,7 +39,6 @@ end
 
 abstract type StochasticModel{B, L} <: Distributions.ContinuousMultivariateDistribution end
 
-#include("models/core.jl")
 include("utils.jl")
 include("diff.jl")
 include("losses.jl")
@@ -48,10 +47,6 @@ include("flows_torch.jl")
 include("vi.jl")
 include("test_gradients.jl")
 
-# models
-#include("models/RandomWalk.jl")
-#include("models/BrockHommes.jl")
-#include("models/SIRJune.jl")
 include("abms.jl")
 
 end

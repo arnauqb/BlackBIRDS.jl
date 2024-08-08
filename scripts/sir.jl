@@ -57,8 +57,8 @@ fig
 ##
 @model function ppl_model(data, abm_rec)
     p ~ filldist(Uniform(0, 1), 4)
-    abm = abm_rec(p)
-    data ~ abm
+    #abm = abm_rec(p)
+    data ~ abm(p)
 end
 d = 4
 #q = make_masked_affine_autoregressive_flow_torch(d, 4, 16);
