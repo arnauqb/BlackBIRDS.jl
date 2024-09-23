@@ -127,21 +127,8 @@ end
 
 Shape expected is (n_features, n_timesteps)
 """
-struct GaussianMMDLoss{T} <: AbstractLoss
-    y::Matrix{T}
-    sigma::T
-    kernel_yy::Matrix{T}
+struct GaussianMMDLoss <: AbstractLoss
     w::Float64
-
-    function GaussianMMDLoss(y::AbstractArray{T}, w) where {T}
-        if ndims(y) == 1
-            y = reshape(y, 1, length(y))
-        end
-        sigma = ChainRulesCore.@ignore_derivatives estimate_sigma(y)
-        kernel_yy = gaussian_kernel(y, y, sigma)
-        kernel_yy = kernel_yy - I(size(kernel_yy, 1))
-        new{T}(y, sigma, kernel_yy, w)
-    end
 end
 
 function (loss::GaussianMMDLoss)(x, y)
@@ -153,12 +140,15 @@ function (loss::GaussianMMDLoss)(x, y)
     end
     nx = size(x, 2)
     ny = size(y, 2)
-    kernel_xy = gaussian_kernel(x, loss.y, loss.sigma)
-    kernel_xx = gaussian_kernel(x, x, loss.sigma)
+    sigma = ChainRulesCore.@ignore_derivatives estimate_sigma(y)
+    kernel_xy = gaussian_kernel(x, y, sigma)
+    kernel_xx = gaussian_kernel(x, x, sigma)
     kernel_xx = kernel_xx - I(size(kernel_xx, 1))
+    kernel_yy = gaussian_kernel(y, y, sigma)
+    kernel_yy = kernel_yy - I(size(kernel_yy, 1))
     loss_value = (
         1 / (nx * (nx - 1)) * sum(kernel_xx) +
-        1 / (ny * (ny - 1)) * sum(loss.kernel_yy) -
+        1 / (ny * (ny - 1)) * sum(kernel_yy) -
         2 / (nx * ny) * sum(kernel_xy)
     )
     return loss_value

@@ -19,9 +19,9 @@ function Distributions.rand(model::ABM)
     return diff_rand(model.ad_backend, rec_f, params)
 end
 Distributions.rand(rng::Random.AbstractRNG, model::ABM) = rand(model)
-function Distributions.logpdf(model::ABM{P, B, L, H}, y) where {P, B, L <: AbstractLoss, H}
-    throw("Loss $L for model $model not implemented")
-end
+#function Distributions.logpdf(model::ABM{P, B, L, H}, y) where {P, B, L <: AbstractLoss, H}
+#    throw("Loss $L for model $model not implemented")
+#end
 
 ## differentiation rules
 
