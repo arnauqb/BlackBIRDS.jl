@@ -8,20 +8,25 @@ function run_vi(;
         max_iter, 
         adtype, 
         gradient_method = "pathwise",
+        transform = true,
         entropy_estimation = AdvancedVI.ClosedFormEntropy()
     )
-    bijector_transf = inverse(bijector(model))
-    q_transformed = transformed(q, bijector_transf)
+    if transform
+        bijector_transf = inverse(bijector(model))
+        q_transformed = transformed(q, bijector_transf)
+    else
+        q_transformed = q
+    end
     ℓπ = DynamicPPL.LogDensityFunction(model)
     if gradient_method == "pathwise"
         elbo = AdvancedVI.RepGradELBO(n_montecarlo, entropy=entropy_estimation)
     elseif gradient_method == "score"
-        elbo = AdvancedVI.ScoreELBO(n_montecarlo, entropy=entropy_estimation)
+        elbo = AdvancedVI.ScoreGradELBO(n_montecarlo, entropy=entropy_estimation)
     else
         error("Gradient method not recognized")
     end
 
-    q, stats, _ = AdvancedVI.optimize(
+    q, _, stats, _ = AdvancedVI.optimize(
         ℓπ,
         elbo,
         q_transformed,
