@@ -25,6 +25,7 @@ function run_vi(;
     else
         error("Gradient method not recognized")
     end
+    q_untrained = deepcopy(q_transformed)
 
     q, _, stats, _ = AdvancedVI.optimize(
         ℓπ,
@@ -34,5 +35,5 @@ function run_vi(;
         adtype,
         optimizer = optimizer
     )
-    return q, stats
+    return q, stats, q_untrained
 end
