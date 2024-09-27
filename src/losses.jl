@@ -1,4 +1,4 @@
-export MSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel
+export MSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel, CustomLoss, hausdorff_distance
 
 using Distances, LinearAlgebra
 
@@ -6,20 +6,23 @@ abstract type AbstractLoss end
 
 struct LLLoss <: AbstractLoss end
 
-struct MSELoss
+struct CustomLoss <: AbstractLoss
+    loss::Function
     w::Float64
 end
-
-(::MSELoss)(x, y) = sum((x - y) .^ 2) / length(y)
+MSELoss(w) = CustomLoss((x, y) -> sum((x - y) .^ 2) / length(y), w)
+function (loss::CustomLoss)(x, y)
+    return loss.loss(x, y)
+end
 
 function Distributions.logpdf(
-        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {B, L <: MSELoss}
+        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {B, L <: CustomLoss}
     x = rand(d)
     return -d.loss(x, y) / d.loss.w
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {B, L <: MSELoss}
+        d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {B, L <: CustomLoss}
     # assume shape is (n_features, n_timesteps)
     x = rand(d)
     loss = 0.0
