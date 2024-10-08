@@ -33,7 +33,9 @@ function ChainRulesCore.rrule(
         ::typeof(diff_rand), ad::AutoForwardDiff, rec_f, params)
     value, jacobian = DifferentiationInterface.value_and_jacobian(
         x -> abm_run(rec_f(x).parameters), ad, params)
+    #println("-"^50)
     #println(params)
+    #println(value)
     #println(jacobian)
     function diff_rand_pullback(y_tangent)
         return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent
