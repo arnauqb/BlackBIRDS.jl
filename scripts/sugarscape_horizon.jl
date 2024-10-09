@@ -313,7 +313,7 @@ n_samples = 15
 q_samples = rand(best_q, n_samples);
 q_untrained_samples = rand(q_untrained, n_samples);
 prior_samples = vcat(rand(prior1, n_samples), rand(prior2, n_samples))
-fig, ax = plt.subplots(1, 2, figsize = (12, 4))
+fig, ax = plt.subplots(1, 2, figsize = (6.6, 3.5))
 alpha = 0.25 
 for i in 1:n_samples
 	q_pred = rand(abm([q_samples[:, i]...]))
@@ -337,7 +337,12 @@ end
 ax[1].set_xlabel("Timestep")
 ax[2].set_xlabel("Timestep")
 ax[1].set_ylabel("Wealth per agent")
-ax[2].set_ylabel("Population alive")
+ax[2].set_ylabel("Population alive", rotation = 270, labelpad = 15)
+# tick right on 2nd axis
+ax[2].yaxis.tick_right()
+ax[2].yaxis.set_label_position("right")
+plt.subplots_adjust(wspace = 0.05)
+fig.savefig("figures/sugarscape_predictions.pdf")
 fig
 
 
