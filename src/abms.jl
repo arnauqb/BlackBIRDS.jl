@@ -38,7 +38,7 @@ function ChainRulesCore.rrule(
     #println(value)
     #println(jacobian)
     function diff_rand_pullback(y_tangent)
-        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent
+        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent[:]
     end
     return value, diff_rand_pullback
 end
@@ -53,7 +53,7 @@ function ChainRulesCore.rrule(
     value = abm_run(rec_f(params).parameters)
     jacobian = sum(st_samples) / n_samples
     function diff_rand_pullback(y_tangent)
-        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent
+        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent[:]
     end
     return value, diff_rand_pullback
 end

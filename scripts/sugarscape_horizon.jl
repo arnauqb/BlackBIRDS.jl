@@ -32,7 +32,7 @@ function DiffABM.abm_run(model::SugarScapeModel)
 	    board_history, x_history, y_history, wealth_history, alive_history, occupied_history = abm_run(params)
 	    wealth_sum = [sum(wealth_history[i]) / (model.params.n_agents * model.params.n_timesteps) for i in 1:model.params.n_timesteps]
         alive_sum = [sum(alive_history[i]) / model.params.n_agents for i in 1:model.params.n_timesteps]
-        return alive_sum #hcat(wealth_sum, alive_sum)'
+        return hcat(wealth_sum, alive_sum)'
     end
     return mean(fetch.([Threads.@spawn run(model.params) for i in 1:1]))
 end
@@ -77,8 +77,7 @@ function make_model(vision_probs, metabolic_rate_probs; gradient_horizon)
 end
 
 abm = ABM(SugarScapeModel(make_model([0.0, 0.0, 1.0], [0.75, 0.25], gradient_horizon = 1)), 
-    AutoForwardDiff(), GaussianMMDLoss(1e-2))
-Base.size(m::typeof(abm)) = (2, m.parameters.params.n_timesteps)
+    AutoForwardDiff(), GaussianMMDLoss(0.05))
 
 ##
 true_params = [0.7, 0.2, 0.1, 0.1, 0.9]
@@ -272,7 +271,7 @@ q, stats, q_untrained, best_q_cb = run_vi(
 	q = q,
 	optimizer = optimizer,
 	n_montecarlo = 10,
-	max_iter = 300,
+	max_iter = 150,
 	gradient_method = "pathwise",
 	adtype = AutoZygote(),
 	#entropy_estimation = AdvancedVI.MonteCarloEntropy(),
@@ -303,74 +302,46 @@ q_samples_untrained = rand(q_untrained, 10000);
 prior1 = Dirichlet([1.0, 1.0, 1.0])
 prior2 = Dirichlet([1.0, 1.0])
 prior_samples = vcat(rand(prior1, 10000), rand(prior2, 10000))
-pygtc.plotGTC([q_samples', q_samples_untrained', prior_samples'], figureSize = 8, truths = true_params)#, paramNames = ["", "sugar_regeneration_rate"])
+fig = pygtc.plotGTC([q_samples', q_samples_untrained', prior_samples'], figureSize = 8, truths = true_params, 
+    paramNames = ["vision_1", "vision_2", "vision_3", "metabolic_rate_1", "metabolic_rate_2"], chainLabels = ["trained flow", "untrained flow", "prior"])
 #pygtc.plotGTC([prior_samples'], figureSize = 8, truths = true_params)#, paramNames = ["", "sugar_regeneration_rate"])
+#fig.savefig("figures/sugarscape_posteriors.pdf")
 
 ##
 # predictive
-n_samples = 10
+n_samples = 15
 q_samples = rand(best_q, n_samples);
 q_untrained_samples = rand(q_untrained, n_samples);
-idcs = randperm(size(prior_samples, 2))[1:n_samples]
-prior_samples = prior_samples[:, idcs]
+prior_samples = vcat(rand(prior1, n_samples), rand(prior2, n_samples))
 fig, ax = plt.subplots(1, 2, figsize = (12, 4))
 alpha = 0.25 
 for i in 1:n_samples
 	q_pred = rand(abm([q_samples[:, i]...]))
-	ax[1].plot(q_pred[1:length(q_pred)÷2], color = "C0", alpha = 0.50)
-	ax[2].plot(q_pred[length(q_pred)÷2+1:end], color = "C0", alpha = 0.50)
+    ax[1].plot(q_pred[1, :], color = "C0", alpha = 0.5)
+	ax[2].plot(q_pred[2, :], color = "C0", alpha = 0.5)
 	true_pred = rand(abm([true_params[i] for i in 1:length(true_params)]))
-	ax[1].plot(true_pred[1:length(true_pred)÷2], color = "C1", alpha = alpha)
-	ax[2].plot(true_pred[length(true_pred)÷2+1:end], color = "C1", alpha = alpha)
+	ax[1].plot(true_pred[1, :], color = "C1", alpha = alpha)
+	ax[2].plot(true_pred[2, :], color = "C1", alpha = alpha)
 	prior_pred = rand(abm([prior_samples[:, i]...]))
-	ax[1].plot(prior_pred[1:length(prior_pred)÷2], color = "C3", alpha = alpha)
-	ax[2].plot(prior_pred[length(prior_pred)÷2+1:end], color = "C3", alpha = alpha)
-	ax[1].plot(data[1:length(data)÷2], color = "black")
-	ax[2].plot(data[length(data)÷2+1:end], color = "black")
+	ax[1].plot(prior_pred[1, :], color = "C3", alpha = alpha)
+	ax[2].plot(prior_pred[2, :], color = "C3", alpha = alpha)
+	ax[1].plot(data[1, :], color = "black")
+	ax[2].plot(data[2, :], color = "black")
 end
 for i in 1:2
-	ax[i].plot([], [], color = "C0", alpha = 0.5, label = "q")
-	ax[i].plot([], [], color = "C1", alpha = 0.5, label = "true")
+	ax[i].plot([], [], color = "C0", alpha = 0.5, label = "trained flow")
+	ax[i].plot([], [], color = "C1", alpha = 0.5, label = "true parameters")
 	ax[i].plot([], [], color = "C3", alpha = 0.5, label = "prior")
 	ax[i].legend()
 end
+ax[1].set_xlabel("Timestep")
+ax[2].set_xlabel("Timestep")
+ax[1].set_ylabel("Wealth per agent")
+ax[2].set_ylabel("Population alive")
 fig
 
 
-##
-abm = ABM(SugarScapeModel(make_model([5.0], gradient_horizon = 101)), AutoForwardDiff(), MSELoss(0.01))
-data = rand(abm([5.0]))
-function sample(params)
-	_, rec_f = Flux.destructure(abm)
-	return rand(rec_f(params))
-end
-function compute_loss(params, data)
-	return sum((sample(params) - data) .^ 2)
-end
-function compute_average_loss(params, data, n_samples)
-	Random.seed!(0)
-	return mean(fetch.([Threads.@spawn compute_loss(params, data) for i in 1:n_samples]))
-end
-##
-params = [2.0]
-n_samples = 50
-grads = vcat([ForwardDiff.gradient(x -> compute_loss(x, data), params) for i in 1:n_samples]...)
-grads_sad = vcat([StochasticAD.derivative_estimate(x -> compute_loss(x, data), params) for i in 1:n_samples]...)
-##
-#m = FiniteDifferences.central_fdm(5, 1)
-#grads_fd = DifferentiationInterface.gradient(x -> compute_average_loss(x, data, 100), AutoFiniteDifferences(m), params)
-
-##
-
-
-fig, ax = plt.subplots()
-ax.boxplot([grads, grads_sad], labels = ["ForwardDiff", "StochasticAD"], showfliers = false)
-#ax.boxplot([grads_sad], labels = ["StochasticAD"], showmeans = true, showfliers = false)
-#ax.axhline(grads_fd[1], color = "red")
-#ax.boxplot(grads_fd, showfliers = false)
-fig
-##
-
+## animation
 using PyCall
 animation = pyimport("matplotlib.animation")
 function run_and_animate(params)

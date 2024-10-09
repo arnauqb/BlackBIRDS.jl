@@ -37,7 +37,7 @@ function __init__()
     @pyinclude(String(@__DIR__)*"/nf_wrapper.py")
 end
 
-abstract type StochasticModel{B, L} end #<: Distributions.ContinuousMultivariateDistribution end
+abstract type StochasticModel{B, L} <: Distributions.ContinuousMatrixDistribution end
 
 include("utils.jl")
 include("diff.jl")
