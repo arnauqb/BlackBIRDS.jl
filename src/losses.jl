@@ -172,7 +172,7 @@ function gaussian_kernel(x, y, sigma)
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{B, L}, y::AbstractArray{<:Real}) where {B, L <: GaussianMMDLoss}
+        d::StochasticModel{B, L}, y::AbstractArray{<:Real, M}) where {B, L <: GaussianMMDLoss, M}
     x = rand(d)
     return -d.loss(x, y) / d.loss.w
 end

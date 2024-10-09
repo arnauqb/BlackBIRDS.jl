@@ -53,5 +53,5 @@ function run_vi(;
 		optimizer = optimizer,
 		callback = best_model_callback,
 	)
-	return q, stats, q_untrained, best_model_callback.best_model
+	return q, stats, q_untrained, best_model_callback
 end

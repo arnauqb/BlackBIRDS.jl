@@ -1,4 +1,4 @@
-export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_flow_torch
+export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_flow_torch, make_neural_spline_flow_torch, make_planar_flow_torch
 
 # wrapper around normflows
 
@@ -105,6 +105,10 @@ function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
         push!(flows, normflows.flows.Permute(dim, mode = "swap"))
     end
     flow_py = normflows.NormalizingFlow(base, flows)
+    # remove the gradient from the parameters
+    for param in collect(flow_py.parameters())
+        param.requires_grad = false
+    end
     return PyTorchFlow(flow_py)
 end
 
@@ -124,4 +128,41 @@ function make_masked_affine_autoregressive_flow_torch(
     end
     flow = PyTorchFlow(nfm)
     return flow
+end
+
+function make_neural_spline_flow_torch(dim, n_layers, hidden_units, hidden_layers=2)
+    # Define flows
+    K = n_layers
+
+    latent_size = dim
+    flows = []
+    for i in 1:K
+        push!(flows, normflows.flows.AutoregressiveRationalQuadraticSpline(latent_size, hidden_layers, hidden_units))
+        push!(flows, normflows.flows.LULinearPermute(latent_size))
+    end
+    # Set base distribuiton
+    push!(flows, normflows.flows.LULinearPermute(latent_size))
+
+    # Set base distribuiton
+    q0 = normflows.distributions.DiagGaussian(dim, trainable=false)
+    # Construct flow model
+    nfm = normflows.NormalizingFlow(q0=q0, flows=flows)
+    for param in collect(nfm.parameters())
+        param.requires_grad = false
+    end
+    
+    return PyTorchFlow(nfm)
+end
+
+function make_planar_flow_torch(dim, n_layers)
+    flows = []
+    for i in 1:n_layers
+        push!(flows, normflows.flows.Planar((dim,), act="leaky_relu"))
+    end
+    q0 = normflows.distributions.DiagGaussian(dim, trainable=false)
+    nfm = normflows.NormalizingFlow(q0=q0, flows=flows)
+    for param in collect(nfm.parameters())
+        param.requires_grad = false
+    end
+    return PyTorchFlow(nfm)
 end
