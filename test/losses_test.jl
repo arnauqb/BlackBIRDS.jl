@@ -3,7 +3,7 @@ using Distributions
 using BlackBIRDS
 using LinearAlgebra
 
-struct TestModel{B, L} <: StochasticModel{B, L}
+struct TestModel{B, L} <: BlackBIRDS.StochasticModel{B, L}
     backend::B
     loss::L
 end
@@ -22,7 +22,7 @@ end
 end
 
 @testset "test KDELoss" begin
-    struct TestDist{B, T, L} <: StochasticModel{B, L}
+    struct TestDist{B, T, L} <: BlackBIRDS.StochasticModel{B, L}
         backend::B
         dist::T
         loss::L
@@ -41,6 +41,10 @@ end
 end
 
 @testset "test MMD loss" begin
+    @testset "test non mutating median" begin
+        @test BlackBIRDS.non_mutating_median([1.0, 4, -2]) == 1.0
+        @test BlackBIRDS.non_mutating_median([1.0, 4, -2, 5]) == 3.0
+    end
     y = reshape([1.0, 4, -2], 1, 3)
     mmd = GaussianMMDLoss(1.0)
     kernel_yy = exp.(-[[0, 9,9] [9, 0,36.0] [9, 36,0]] / (18))

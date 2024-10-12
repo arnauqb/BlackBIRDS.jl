@@ -17,6 +17,7 @@ import DynamicPPL
 import Functors
 import ForwardDiff
 import LogDensityProblems
+using LinearAlgebra
 import Optimisers
 using SimpleUnPack
 import StochasticAD

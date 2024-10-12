@@ -1,6 +1,8 @@
-export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_flow_torch, make_neural_spline_flow_torch, make_planar_flow_torch
+export PyTorchFlow, make_real_nvp_flow_torch, make_masked_affine_autoregressive_flow_torch,
+       make_neural_spline_flow_torch, make_planar_flow_torch
 
 # wrapper around normflows
+import ForwardDiff: Dual, Partials
 
 struct PyTorchFlow{T, N, M} <: Distributions.ContinuousMultivariateDistribution
     func_sampler::PyObject
@@ -47,9 +49,11 @@ function Distributions.logpdf(dist::PyTorchFlow, x::AbstractVector{<:Real})
     logpdf(dist, reshape(x, length(x), 1))[1]
 end
 
+## Zygote rules
 function ChainRulesCore.rrule(::typeof(rand), d::PyTorchFlow, n::Int64)
     samples, vjp = py"make_vjp_sampler"(
-        d.func_sampler, d.params, torch.tensor(d.params_flat, dtype = torch.float), d.buffers, d.indices, n)
+        d.func_sampler, d.params, torch.tensor(d.params_flat, dtype = torch.float),
+        d.buffers, d.indices, n)
     function rand_pullback(y_tangent)
         grad, = vjp(torch.tensor(y_tangent, dtype = torch.float))
         d_tangent = Tangent{PyTorchFlow}(; params_flat = grad.numpy())
@@ -96,6 +100,8 @@ function ChainRulesCore.rrule(::typeof(logpdf), d::PyTorchFlow, x::AbstractMatri
     return lps.numpy(), logpdf_pullback
 end
 
+## Flow constructors
+
 function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
     base = normflows.distributions.base.DiagGaussian(dim)
     flows = []
@@ -130,37 +136,39 @@ function make_masked_affine_autoregressive_flow_torch(
     return flow
 end
 
-function make_neural_spline_flow_torch(dim, n_layers, hidden_units, hidden_layers=2)
+function make_neural_spline_flow_torch(dim, n_layers, hidden_units, hidden_layers = 2)
     # Define flows
     K = n_layers
 
     latent_size = dim
     flows = []
     for i in 1:K
-        push!(flows, normflows.flows.AutoregressiveRationalQuadraticSpline(latent_size, hidden_layers, hidden_units))
+        push!(flows,
+            normflows.flows.AutoregressiveRationalQuadraticSpline(
+                latent_size, hidden_layers, hidden_units))
         push!(flows, normflows.flows.LULinearPermute(latent_size))
     end
     # Set base distribuiton
     push!(flows, normflows.flows.LULinearPermute(latent_size))
 
     # Set base distribuiton
-    q0 = normflows.distributions.DiagGaussian(dim, trainable=false)
+    q0 = normflows.distributions.DiagGaussian(dim, trainable = false)
     # Construct flow model
-    nfm = normflows.NormalizingFlow(q0=q0, flows=flows)
+    nfm = normflows.NormalizingFlow(q0 = q0, flows = flows)
     for param in collect(nfm.parameters())
         param.requires_grad = false
     end
-    
+
     return PyTorchFlow(nfm)
 end
 
 function make_planar_flow_torch(dim, n_layers)
     flows = []
     for i in 1:n_layers
-        push!(flows, normflows.flows.Planar((dim,), act="leaky_relu"))
+        push!(flows, normflows.flows.Planar((dim,), act = "leaky_relu"))
     end
-    q0 = normflows.distributions.DiagGaussian(dim, trainable=false)
-    nfm = normflows.NormalizingFlow(q0=q0, flows=flows)
+    q0 = normflows.distributions.DiagGaussian(dim, trainable = false)
+    nfm = normflows.NormalizingFlow(q0 = q0, flows = flows)
     for param in collect(nfm.parameters())
         param.requires_grad = false
     end

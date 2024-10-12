@@ -133,41 +133,87 @@ struct GaussianMMDLoss <: AbstractLoss
     w::Float64
 end
 
-function (loss::GaussianMMDLoss)(x, y)
-    if ndims(x) == 1
-        x = reshape(x, 1, length(x))
-    end
-    if ndims(y) == 1
-        y = reshape(y, 1, length(y))
-    end
-    nx = size(x, 2)
-    ny = size(y, 2)
-    sigma = ChainRulesCore.@ignore_derivatives estimate_sigma(y)
-    kernel_xy = gaussian_kernel(x, y, sigma)
-    kernel_xx = gaussian_kernel(x, x, sigma)
-    kernel_xx = kernel_xx - I(size(kernel_xx, 1))
-    kernel_yy = gaussian_kernel(y, y, sigma)
-    kernel_yy = kernel_yy - I(size(kernel_yy, 1))
-    loss_value = (
-        1 / (nx * (nx - 1)) * sum(kernel_xx) +
-        1 / (ny * (ny - 1)) * sum(kernel_yy) -
-        2 / (nx * ny) * sum(kernel_xy)
-    )
-    return loss_value
+#function (loss::GaussianMMDLoss)(x, y)
+#    if ndims(x) == 1
+#        x = reshape(x, 1, length(x))
+#    end
+#    if ndims(y) == 1
+#        y = reshape(y, 1, length(y))
+#    end
+#    nx = size(x, 2)
+#    ny = size(y, 2)
+#    sigma = estimate_sigma(y)
+#    kernel_xy = gaussian_kernel(x, y, sigma)
+#    kernel_xx = gaussian_kernel(x, x, sigma)
+#    kernel_xx = kernel_xx - I(size(kernel_xx, 1))
+#    kernel_yy = gaussian_kernel(y, y, sigma)
+#    kernel_yy = kernel_yy - I(size(kernel_yy, 1))
+#    loss_value = (
+#        1 / (nx * (nx - 1)) * sum(kernel_xx) +
+#        1 / (ny * (ny - 1)) * sum(kernel_yy) -
+#        2 / (nx * ny) * sum(kernel_xy)
+#    )
+#    return loss_value
+#end
+#
+#
+#function estimate_sigma(y)
+#    dist = pairwise(SqEuclidean(), y, y, dims = 1)
+#    # exclude self distances
+#    diag = I(size(dist, 1))
+#    dist = dist .- dist .* diag
+#    return sqrt(non_mutating_median(dist))
+#end
+#
+#function gaussian_kernel(x, y, sigma)
+#    dist = pairwise(SqEuclidean(), x, y, dims = 1)
+#    kernel_matrix = @. exp(-(dist) / (2 * sigma^2))
+#    return kernel_matrix
+#end
+
+#function non_mutating_median(arr)
+#    sorted = sort(copy(arr), dims = 2)
+#    n = size(sorted, 2)
+#    return n % 2 == 1 ? sorted[:, (n+1)÷2] : (sorted[:, n÷2] + sorted[:, n÷2+1]) / 2
+#end
+
+function mmd_estimate_sigma(X::AbstractMatrix, Y::AbstractMatrix)
+    N, T_x = size(X)
+    _, T_y = size(Y)
+    
+    # Combine all data points
+    all_points = hcat(X, Y)
+    
+    # Compute pairwise distances
+    n_total = T_x + T_y
+    distances = [norm(all_points[:, i] - all_points[:, j]) for i in 1:n_total for j in (i+1):n_total]
+    
+    # Use median heuristic
+    return median(distances)
 end
 
-function estimate_sigma(y)
-    dist = pairwise(SqEuclidean(), y, y, dims = 2)
-    # exclude self distances
-    diag = I(size(dist, 1))
-    dist = dist .- dist .* diag
-    return sqrt(median(dist))
+function gaussian_kernel(x::AbstractMatrix, y::AbstractMatrix, sigma::Float64)
+    dist_sq = pairwise(SqEuclidean(), x, y, dims=2)
+    return exp.(-dist_sq ./ (2 * sigma^2))
 end
 
-function gaussian_kernel(x, y, sigma)
-    dist = pairwise(SqEuclidean(), x, y, dims = 2)
-    kernel_matrix = @. exp(-(dist) / (2 * sigma^2))
-    return kernel_matrix
+function (loss::GaussianMMDLoss)(X::AbstractMatrix, Y::AbstractMatrix)
+    N, T_x = size(X)
+    _, T_y = size(Y)
+    
+    sigma = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(X), DiffABM.ignore_gradient.(Y))
+
+    # Compute self-similarity terms
+    K_xx = mean(gaussian_kernel(X, X, sigma))
+    K_yy = mean(gaussian_kernel(Y, Y, sigma))
+    
+    # Compute cross-similarity term
+    K_xy = mean(gaussian_kernel(X, Y, sigma))
+    
+    # Compute MMD loss
+    mmd = K_xx + K_yy - 2 * K_xy
+    
+    return mmd
 end
 
 function Distributions.logpdf(

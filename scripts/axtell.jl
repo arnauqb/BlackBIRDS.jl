@@ -20,19 +20,20 @@ using Zygote
 
 ##
 function make_abm_params(a, b)
-    n_agents = 1000
+    n_agents = 5000
     n_timesteps = 100
     neighbors = [sample(1:n_agents, rand(2:6), replace = false) for _ in 1:n_agents]
     agent_initializer = DiffABM.RandomAxtellAgentInitializer(
         n_agents, (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), neighbors)
+    gradient_horizon = 10
     return DiffABM.AxtellFirmsParams(
-        agent_initializer, [a], [b], 0.05, 1.0, n_timesteps, 1.0)
+        agent_initializer, [a], [b], 0.05, 1.0, n_timesteps, 1.0, gradient_horizon)
 end
-true_params = [0.5, 2.0]
+true_params = [0.5, 3.0]
 prior = Product([Uniform(0.0, 5.0), Uniform(0.0, 5.0)])
 params_to_try = rand(prior, 5)
-abm = ABM(make_abm_params(true_params...), AutoForwardDiff(), KDELoss(10, MMDKernel()))
-data = rand(abm(true_params))
+abm = ABM(make_abm_params(true_params...), AutoForwardDiff(), GaussianMMDLoss(1e-5))
+data = sum([rand(abm(true_params)) for _ in 1:10]) / 10
 fig, ax = plt.subplots(1, 3, figsize = (12, 4))
 for i in 1:size(params_to_try, 2)
     toplot = rand(abm(params_to_try[:, i]))
@@ -50,6 +51,68 @@ ax[1].legend()
 fig
 
 ##
+# test mmd loss point calibration
+function evaluate(params, n)
+    return -mean(fetch.([Threads.@spawn logpdf(abm([params...]), data) for i in 1:n]))
+end
+params = [0.2, 2.5]
+n_epochs = 2000
+lr = 1e-3
+n_samples = 30
+rule = Optimisers.Adam(lr)
+state_tree = Optimisers.setup(rule, params);  # initialise this optimiser's momentum etc.
+losses = []
+params_history = []
+for i in 1:n_epochs
+    loss, grads = DifferentiationInterface.value_and_gradient(x -> evaluate(x, n_samples), AutoForwardDiff(), params)
+    state_tree, params = Optimisers.update(state_tree, params, grads)
+    println("Epoch: $i, params $(params)")
+    push!(losses, loss)
+    push!(params_history, copy(params))
+end
+
+##
+fig, ax = plt.subplots(1, 2)
+ax[1].plot(losses)
+ax[2].plot(hcat(params_history...)[1, :], label = "a")
+ax[2].plot(hcat(params_history...)[2, :], label = "b")
+ax[2].axhline(true_params[1], color = "C0")
+ax[2].axhline(true_params[2], color = "C1")
+ax[2].legend()
+fig
+
+##
+# predictions
+n_samples = 10
+trained_params = params_history[end]
+prior_params = params_history[1]
+fig, ax = plt.subplots(1, 3, figsize = (12, 4))
+for i in 1:n_samples
+    trained_pred = rand(abm(trained_params))
+    prior_pred = rand(abm(prior_params))
+    true_pred = rand(abm(true_params))
+    ax[1].plot(trained_pred[1, :], color = "C0", alpha = 0.5)
+    ax[2].plot(trained_pred[2, :], color = "C0", alpha = 0.5)
+    ax[3].plot(trained_pred[3, :], color = "C0", alpha = 0.5)
+    ax[1].plot(prior_pred[1, :], color = "C3", alpha = 0.5)
+    ax[2].plot(prior_pred[2, :], color = "C3", alpha = 0.5)
+    ax[3].plot(prior_pred[3, :], color = "C3", alpha = 0.5)
+    ax[1].plot(true_pred[1, :], color = "C1", alpha = 0.5)
+    ax[2].plot(true_pred[2, :], color = "C1", alpha = 0.5)
+    ax[3].plot(true_pred[3, :], color = "C1", alpha = 0.5)
+end
+ax[1].plot(data[1, :], color = "black", label = "data")
+ax[2].plot(data[2, :], color = "black", label = "data")
+ax[3].plot(data[3, :], color = "black", label = "data")
+ax[1].plot([], [], color = "C0", alpha = 0.5, label = "trained")
+ax[1].plot([], [], color = "C1", alpha = 0.5, label = "true")
+ax[1].plot([], [], color = "C3", alpha = 0.5, label = "prior")
+ax[1].legend()
+fig
+
+
+
+##
 @model function make_ppl_model(data)
     a ~ Uniform(0.0, 5.0)
     b ~ Uniform(0.0, 5.0)
@@ -57,8 +120,8 @@ fig
 end
 
 prob_model = make_ppl_model(data)
-##
 d = 2
+#d = 3
 q = make_masked_affine_autoregressive_flow_torch(2, 16, 32);
 optimizer = Optimisers.AdamW(1e-4, (0.9, 0.99), 1e-4)
 #optimizer = Optimisers.OptimiserChain(Optimisers.ClipNorm(5.0), optimizer)
@@ -67,10 +130,9 @@ q, stats, q_untrained, best_q_cb = run_vi(
     q = q,
     optimizer = optimizer,
     n_montecarlo = 10,
-    max_iter = 200,
+    max_iter = 500,
     gradient_method = "pathwise",
     adtype = AutoZygote(),
-    #entropy_estimation = AdvancedVI.MonteCarloEntropy(),
     entropy_estimation = AdvancedVI.StickingTheLandingEntropy()
 );
 best_q = best_q_cb.best_model
@@ -80,7 +142,6 @@ best_elbo = best_q_cb.best_elbo
 elbo = [s.elbo for s in stats]
 fig, ax = plt.subplots()
 ax.plot(elbo)
-# estimate best possible loss
 best_loss = mean([logpdf(abm(true_params), data) for i in 1:20])
 ax.axhline(best_loss, color = "red")
 fig
@@ -111,9 +172,9 @@ for i in 1:n_samples
     ax[2].plot(q_pred[2, :], color = "C0", alpha = 0.5)
     ax[3].plot(q_pred[3, :], color = "C0", alpha = 0.5)
     true_pred = rand(abm([true_params[i] for i in 1:length(true_params)]))
-    #ax[1].plot(true_pred[1, :], color = "C1", alpha = alpha)
-    #ax[2].plot(true_pred[2, :], color = "C1", alpha = alpha)
-    #ax[3].plot(true_pred[3, :], color = "C1", alpha = alpha)
+    ax[1].plot(true_pred[1, :], color = "C1", alpha = alpha)
+    ax[2].plot(true_pred[2, :], color = "C1", alpha = alpha)
+    ax[3].plot(true_pred[3, :], color = "C1", alpha = alpha)
     prior_pred = rand(abm([prior_samples[:, i]...]))
     ax[1].plot(prior_pred[1, :], color = "C3", alpha = alpha)
     ax[2].plot(prior_pred[2, :], color = "C3", alpha = alpha)
