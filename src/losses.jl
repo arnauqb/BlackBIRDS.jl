@@ -1,4 +1,4 @@
-export MSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel, CustomLoss, hausdorff_distance
+export MSELoss, RelativeMSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel, CustomLoss, hausdorff_distance
 
 using Distances, LinearAlgebra
 
@@ -11,6 +11,7 @@ struct CustomLoss <: AbstractLoss
     w::Float64
 end
 MSELoss(w) = CustomLoss((x, y) -> sum((x - y) .^ 2) / length(y), w)
+RelativeMSELoss(w) = CustomLoss((x, y) -> sum((x - y) .^ 2 ./ (y .^ 2)) / length(y), w)
 function (loss::CustomLoss)(x, y)
     return loss.loss(x, y)
 end
@@ -108,18 +109,16 @@ function Distributions.logpdf(
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {
+        d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {
         B, L <: KDELoss{<:MMDKernel}}
-    x_samples = [rand(d) for _ in 1:(d.loss.n_samples)]
-    #x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    #x_samples = [rand(d) for _ in 1:(d.loss.n_samples)]
+    x_samples = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
 
-    x_samples = hcat(x_samples...)
     lps = 0.0 # zeros(d.loss.n_samples)
-    mmd_loss = GaussianMMDLoss(y, 1.0)
+    mmd_loss = GaussianMMDLoss(1.0)
     epsilon = 1e-3
     for i in 1:(d.loss.n_samples)
-        x = x_samples[:, i]
-        loss = mmd_loss(x, y)
+        loss = mmd_loss(x_samples[i], y)
         lps += exp(-loss^2 / epsilon)
     end
     return log(lps / d.loss.n_samples)

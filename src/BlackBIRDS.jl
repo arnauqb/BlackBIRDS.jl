@@ -4,6 +4,7 @@ export StochasticModel, AutoStochasticAD, AutoForwardDiff, AutoZygote
 
 using ADTypes
 using AdvancedVI
+using AdvancedHMC
 using Bijectors
 using ChainRulesCore
 using DiffABM # TODO: make an extension
@@ -46,7 +47,7 @@ include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
 include("test_gradients.jl")
-
+include("hmc.jl")
 include("abms.jl")
 
 end
