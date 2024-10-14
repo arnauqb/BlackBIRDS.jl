@@ -19,38 +19,53 @@ using Random
 using Zygote
 
 ##
-function make_abm_params(a, b)
-    n_agents = 5000
+function make_abm_params(thetas_bounds, initial_efforts_bounds, a, b)
+    n_agents = 1000
     n_timesteps = 100
     neighbors = [sample(1:n_agents, rand(2:6), replace = false) for _ in 1:n_agents]
     agent_initializer = DiffABM.RandomAxtellAgentInitializer(
-        n_agents, (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), neighbors)
+        n_agents, thetas_bounds, initial_efforts_bounds, neighbors)
     gradient_horizon = 10
     return DiffABM.AxtellFirmsParams(
         agent_initializer, [a], [b], 0.05, 1.0, n_timesteps, 1.0, gradient_horizon)
 end
-true_params = [0.5, 3.0]
-prior = Product([Uniform(0.0, 5.0), Uniform(0.0, 5.0)])
-params_to_try = rand(prior, 5)
-abm = ABM(make_abm_params(true_params...), AutoForwardDiff(), GaussianMMDLoss(1e-5))
-data = sum([rand(abm(true_params)) for _ in 1:10]) / 10
+function sample_from_prior(n)
+    a = rand(Uniform(0.0, 5.0), n)
+    b = rand(Uniform(0.0, 5.0), n)
+    theta_low = rand(Uniform(0.0, 1.0), n)
+    theta_high = theta_low .+ rand.(Uniform.(0.0, 1.0 .- theta_low))
+    initial_effort_low = rand(Uniform(0.0, 1.0), n)
+    initial_effort_high = initial_effort_low .+
+                          rand.(Uniform.(0.0, 1.0 .- initial_effort_low))
+    return hcat(theta_low, theta_high, initial_effort_low, initial_effort_high, a, b)'
+end
+params_to_try = sample_from_prior(5)
+true_params = [[0.3, 0.7], [0.2, 0.8], 0.5, 3.0]
+abm = ABM(make_abm_params(true_params...), AutoForwardDiff(), MSELoss(0.01))
+data = sum([rand(abm(vcat(true_params...))) for _ in 1:10]) / 10
 fig, ax = plt.subplots(1, 3, figsize = (12, 4))
 for i in 1:size(params_to_try, 2)
-    toplot = rand(abm(params_to_try[:, i]))
-    ax[1].plot(toplot[1, :],
-        label = "a=$(round(params_to_try[1, i], digits=2)), b=$(round(params_to_try[2, i], digits=2))")
-    ax[2].plot(toplot[2, :],
-        label = "a=$(round(params_to_try[1, i], digits=2)), b=$(round(params_to_try[2, i], digits=2))")
-    ax[3].plot(toplot[3, :],
-        label = "a=$(round(params_to_try[1, i], digits=2)), b=$(round(params_to_try[2, i], digits=2))")
+    toplot = mean([rand(abm(params_to_try[:, i])) for _ in 1:10])
+    ax[1].plot(toplot[1, :])
+    ax[2].plot(toplot[2, :])
+    ax[3].plot(toplot[3, :])
 end
 ax[1].plot(data[1, :], color = "black", label = "data")
+ax[1].set_ylabel("Mean Agent Effort")
 ax[2].plot(data[2, :], color = "black", label = "data")
+ax[2].set_ylabel("Mean Firm Output")
 ax[3].plot(data[3, :], color = "black", label = "data")
+ax[3].set_ylabel("Mean Firm Size")
 ax[1].legend()
 fig
 
 ##
+v, f= Zygote.pullback(logpdf, abm, data)
+f(v)
+
+##
+
+
 # test mmd loss point calibration
 function evaluate(params, n)
     return -mean(fetch.([Threads.@spawn logpdf(abm([params...]), data) for i in 1:n]))
@@ -64,7 +79,8 @@ state_tree = Optimisers.setup(rule, params);  # initialise this optimiser's mome
 losses = []
 params_history = []
 for i in 1:n_epochs
-    loss, grads = DifferentiationInterface.value_and_gradient(x -> evaluate(x, n_samples), AutoForwardDiff(), params)
+    loss, grads = DifferentiationInterface.value_and_gradient(
+        x -> evaluate(x, n_samples), AutoForwardDiff(), params)
     state_tree, params = Optimisers.update(state_tree, params, grads)
     println("Epoch: $i, params $(params)")
     push!(losses, loss)
@@ -110,19 +126,21 @@ ax[1].plot([], [], color = "C3", alpha = 0.5, label = "prior")
 ax[1].legend()
 fig
 
-
-
 ##
 @model function make_ppl_model(data)
+    theta_lower ~ Uniform(0.0, 1.0)
+    theta_upper ~ Uniform(theta_lower, 1.0)
+    initial_effort_lower ~ Uniform(0.0, 1.0)
+    initial_effort_upper ~ Uniform(initial_effort_lower, 1.0)
     a ~ Uniform(0.0, 5.0)
     b ~ Uniform(0.0, 5.0)
-    data ~ abm([a, b])
+    data ~ abm([theta_lower, theta_upper, initial_effort_lower, initial_effort_upper, a, b])
 end
 
 prob_model = make_ppl_model(data)
-d = 2
+d = 6
 #d = 3
-q = make_masked_affine_autoregressive_flow_torch(2, 16, 32);
+q = make_masked_affine_autoregressive_flow_torch(d, 16, 32);
 optimizer = Optimisers.AdamW(1e-4, (0.9, 0.99), 1e-4)
 #optimizer = Optimisers.OptimiserChain(Optimisers.ClipNorm(5.0), optimizer)
 q, stats, q_untrained, best_q_cb = run_vi(
@@ -130,7 +148,7 @@ q, stats, q_untrained, best_q_cb = run_vi(
     q = q,
     optimizer = optimizer,
     n_montecarlo = 10,
-    max_iter = 500,
+    max_iter = 50,
     gradient_method = "pathwise",
     adtype = AutoZygote(),
     entropy_estimation = AdvancedVI.StickingTheLandingEntropy()
@@ -142,8 +160,8 @@ best_elbo = best_q_cb.best_elbo
 elbo = [s.elbo for s in stats]
 fig, ax = plt.subplots()
 ax.plot(elbo)
-best_loss = mean([logpdf(abm(true_params), data) for i in 1:20])
-ax.axhline(best_loss, color = "red")
+#best_loss = mean([logpdf(abm(true_params), data) for i in 1:20])
+#ax.axhline(best_loss, color = "red")
 fig
 
 ##
@@ -151,11 +169,12 @@ using PyCall
 pygtc = pyimport("pygtc")
 q_samples = rand(best_q, 10000);
 q_samples_untrained = rand(q_untrained, 10000);
-prior = Product([Uniform(0.0, 5.0), Uniform(0.0, 5.0)])
-prior_samples = rand(prior, 10000)
+prior_samples = sample_from_prior(10000)#Product([Uniform(0.0, 5.0), Uniform(0.0, 5.0)])
 fig = pygtc.plotGTC([q_samples', q_samples_untrained', prior_samples'],
-    figureSize = 8, truths = true_params,
-    paramNames = ["a", "b"], chainLabels = ["trained flow", "untrained flow", "prior"])
+    figureSize = 8, truths = vcat(true_params...))
+    #, truths = true_params,
+    #paramNames = ["theta_lower", "theta_upper", "initial_effort_lower", "initial_effort_upper", "a", "b"],
+    #chainLabels = ["trained flow", "untrained flow", "prior"])
 #fig.savefig("figures/axtell_posteriors.pdf")
 
 ##

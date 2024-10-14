@@ -2,7 +2,7 @@
 
 julia_version = "1.10.5"
 manifest_format = "2.0"
-project_hash = "cb3e911ba3d4d43dc9c574a7150111edb661505c"
+project_hash = "1d61d177c6727e1f087df3d90cfbfcee0ad7253b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
@@ -846,12 +846,6 @@ deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
 git-tree-sha1 = "7c4195be1649ae622304031ed46a2f4df989f1eb"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.24"
-
-[[deps.IPMeasures]]
-deps = ["CUDA", "Distances", "Flux", "LinearAlgebra", "StatsBase"]
-path = "../IPMeasures.jl"
-uuid = "d7dc6e0c-a753-11e8-227e-b362679e0b17"
-version = "0.2.5"
 
 [[deps.IRTools]]
 deps = ["InteractiveUtils", "MacroTools"]
