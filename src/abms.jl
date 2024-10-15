@@ -34,7 +34,8 @@ function ChainRulesCore.rrule(
     value, jacobian = DifferentiationInterface.value_and_jacobian(
         x -> abm_run(rec_f(x).parameters), ad, params)
     function diff_rand_pullback(y_tangent)
-        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent[:]
+        grad = jacobian' * y_tangent[:]
+        return NoTangent(), NoTangent(), NoTangent(), grad
     end
     return value, diff_rand_pullback
 end

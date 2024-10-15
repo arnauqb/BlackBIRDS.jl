@@ -149,9 +149,6 @@ function make_neural_spline_flow_torch(dim, n_layers, hidden_units, hidden_layer
         push!(flows, normflows.flows.LULinearPermute(latent_size))
     end
     # Set base distribuiton
-    push!(flows, normflows.flows.LULinearPermute(latent_size))
-
-    # Set base distribuiton
     q0 = normflows.distributions.DiagGaussian(dim, trainable = false)
     # Construct flow model
     nfm = normflows.NormalizingFlow(q0 = q0, flows = flows)

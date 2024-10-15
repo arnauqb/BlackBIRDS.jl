@@ -1,4 +1,5 @@
-export MSELoss, RelativeMSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, MMDKernel, CustomLoss, hausdorff_distance
+export MSELoss, RelativeMSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel,
+       MMDKernel, CustomLoss, hausdorff_distance
 
 using Distances, LinearAlgebra
 
@@ -131,93 +132,42 @@ Shape expected is (n_features, n_timesteps)
 """
 struct GaussianMMDLoss <: AbstractLoss
     w::Float64
+    n_samples::Int64
 end
 
-#function (loss::GaussianMMDLoss)(x, y)
-#    if ndims(x) == 1
-#        x = reshape(x, 1, length(x))
-#    end
-#    if ndims(y) == 1
-#        y = reshape(y, 1, length(y))
-#    end
-#    nx = size(x, 2)
-#    ny = size(y, 2)
-#    sigma = estimate_sigma(y)
-#    kernel_xy = gaussian_kernel(x, y, sigma)
-#    kernel_xx = gaussian_kernel(x, x, sigma)
-#    kernel_xx = kernel_xx - I(size(kernel_xx, 1))
-#    kernel_yy = gaussian_kernel(y, y, sigma)
-#    kernel_yy = kernel_yy - I(size(kernel_yy, 1))
-#    loss_value = (
-#        1 / (nx * (nx - 1)) * sum(kernel_xx) +
-#        1 / (ny * (ny - 1)) * sum(kernel_yy) -
-#        2 / (nx * ny) * sum(kernel_xy)
-#    )
-#    return loss_value
-#end
-#
-#
-#function estimate_sigma(y)
-#    dist = pairwise(SqEuclidean(), y, y, dims = 1)
-#    # exclude self distances
-#    diag = I(size(dist, 1))
-#    dist = dist .- dist .* diag
-#    return sqrt(non_mutating_median(dist))
-#end
-#
-#function gaussian_kernel(x, y, sigma)
-#    dist = pairwise(SqEuclidean(), x, y, dims = 1)
-#    kernel_matrix = @. exp(-(dist) / (2 * sigma^2))
-#    return kernel_matrix
-#end
-
-#function non_mutating_median(arr)
-#    sorted = sort(copy(arr), dims = 2)
-#    n = size(sorted, 2)
-#    return n % 2 == 1 ? sorted[:, (n+1)÷2] : (sorted[:, n÷2] + sorted[:, n÷2+1]) / 2
-#end
-
-function mmd_estimate_sigma(X::AbstractMatrix, Y::AbstractMatrix)
-    N, T_x = size(X)
-    _, T_y = size(Y)
-    
-    # Combine all data points
-    all_points = hcat(X, Y)
-    
-    # Compute pairwise distances
-    n_total = T_x + T_y
-    distances = [norm(all_points[:, i] - all_points[:, j]) for i in 1:n_total for j in (i+1):n_total]
-    
-    # Use median heuristic
-    return median(distances)
+function mmd_estimate_sigma(y::AbstractMatrix{T}) where {T}
+    sigmas = T[]
+    for i in axes(y, 1)
+        distances = pairwise(Euclidean(), y[i, :], y[i, :])
+        push!(sigmas, median(distances))
+    end
+    return sigmas
 end
 
-function gaussian_kernel(x::AbstractMatrix, y::AbstractMatrix, sigma::Float64)
-    dist_sq = pairwise(SqEuclidean(), x, y, dims=2)
-    return exp.(-dist_sq ./ (2 * sigma^2))
-end
-
-function (loss::GaussianMMDLoss)(X::AbstractMatrix, Y::AbstractMatrix)
-    N, T_x = size(X)
-    _, T_y = size(Y)
-    
-    sigma = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(X), DiffABM.ignore_gradient.(Y))
-
-    # Compute self-similarity terms
-    K_xx = mean(gaussian_kernel(X, X, sigma))
-    K_yy = mean(gaussian_kernel(Y, Y, sigma))
-    
-    # Compute cross-similarity term
-    K_xy = mean(gaussian_kernel(X, Y, sigma))
-    
-    # Compute MMD loss
-    mmd = K_xx + K_yy - 2 * K_xy
-    
-    return mmd
+function gaussian_kernel(x, y, sigmas)
+    covariance = Diagonal(sigmas)
+    distances = [norm(x[i, :] - y[i, :]) for i in axes(x, 1)]
+    return logpdf(MvNormal(zeros(length(sigmas)), covariance), distances)
 end
 
 function Distributions.logpdf(
-        d::StochasticModel{B, L}, y::AbstractArray{<:Real, M}) where {B, L <: GaussianMMDLoss, M}
-    x = rand(d)
-    return -d.loss(x, y) / d.loss.w
+        d::StochasticModel{B, L}, y::AbstractArray{<:Real, M}) where {
+        B, L <: GaussianMMDLoss, M}
+    n_samples = d.loss.n_samples
+    if n_samples < 2
+        throw(ArgumentError("n_samples must be at least 2."))
+    end
+    # This is broken in Zygote!!
+    #xs = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
+    xs = [rand(d) for _ in 1:(d.loss.n_samples)]
+    sigmas = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(y))
+    iterator = 1:n_samples
+    # kxx is the mean of the kernel between each sample except with itself
+    kxx = mean([gaussian_kernel(xs[i], xs[j], sigmas) for i in iterator, j in iterator if i != j])
+    # kyy is the mean of the kernel between each sample and itself
+    kyy = mean([gaussian_kernel(xs[i], xs[j], sigmas) for i in iterator, j in iterator if i != j])
+    # kxy is the mean of the kernel between each sample and the target
+    kxy = mean([gaussian_kernel(xs[i], y, sigmas) for i in iterator])
+    mmd_loss = kxx + kyy - 2 * kxy
+    return -mmd_loss / d.loss.w
 end
