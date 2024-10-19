@@ -103,15 +103,20 @@ end
 ## Flow constructors
 
 function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
-    base = normflows.distributions.base.DiagGaussian(dim)
     flows = []
-    for _ in 1:n_layers
-        param_map = normflows.nets.MLP([2, hidden_dim, hidden_dim, dim], init_zeros = true)
+    for i in 1:n_layers
+        # Neural network with two hidden layers having 64 units each
+        # Last layer is initialized by zeros making training more stable
+        param_map = normflows.nets.MLP(
+            [Int(dim / 2), hidden_dim, hidden_dim, dim], init_zeros = true)
+        # Add flow layer
         push!(flows, normflows.flows.AffineCouplingBlock(param_map))
+        # Swap dimensions
         push!(flows, normflows.flows.Permute(dim, mode = "swap"))
     end
+    base = normflows.distributions.base.DiagGaussian(dim)
+    # Construct flow model
     flow_py = normflows.NormalizingFlow(base, flows)
-    # remove the gradient from the parameters
     for param in collect(flow_py.parameters())
         param.requires_grad = false
     end
