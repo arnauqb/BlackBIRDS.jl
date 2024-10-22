@@ -44,7 +44,8 @@ function ChainRulesCore.rrule(
     n_samples = ad.n_samples
     st_samples = Matrix{Float64}[]
     st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(
-                             x -> abm_run(rec_f(x).parameters), params)...) for _ in 1:n_samples])
+                             x -> abm_run(rec_f(x).parameters), params)...)
+                         for _ in 1:n_samples])
     #st_samples = [hcat(StochasticAD.derivative_estimate(
     #                  x -> abm_run(rec_f(x).parameters), params)...) for _ in 1:n_samples]
     value = abm_run(rec_f(params).parameters)
@@ -74,3 +75,33 @@ end
 #    end
 #    return v, rand_pullback
 #end
+
+function threaded_sampling(distribution::StochasticModel, n_samples)
+    params, f = Flux.destructure(distribution)
+    ad_backend = distribution.ad_backend
+    return threaded_sampling(f, ad_backend, params, n_samples)
+end
+
+function threaded_sampling(f, ad_backend, params, n_samples)
+    abm = f(params)
+    return fetch.([Threads.@spawn diff_rand(ad_backend, f, params) for _ in 1:n_samples])
+end
+
+function ChainRulesCore.rrule(::typeof(threaded_sampling), f, ad_backend, params, n_samples)
+    samples = fetch.([Threads.@spawn Zygote.pullback(diff_rand, ad_backend, f, params)
+                      for _ in 1:n_samples])
+    values = [samples[i][1] for i in 1:n_samples]
+    pullbacks = [samples[i][2] for i in 1:n_samples]
+
+    function threaded_sampling_pullback(ȳ)
+        ret = []
+        for i in 1:n_samples
+            y_tangent_sample = ȳ[i]
+            grad = pullbacks[i](y_tangent_sample)[3]
+            push!(ret, grad)
+        end
+        return (NoTangent(), NoTangent(), NoTangent(), sum(ret), NoTangent())
+    end
+
+    return values, threaded_sampling_pullback
+end

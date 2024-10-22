@@ -1,5 +1,27 @@
 export run_vi
 
+#function ChainRulesCore.rrule(
+#    ::typeof(AdvancedVI.estimate_energy_with_samples), prob, samples
+#)
+#    println("hello")
+#    fn = Base.Fix1(LogDensityProblems.logdensity, prob)
+#    fn_samples =
+#        fetch.([
+#            Threads.@spawn Zygote.pullback(fn, sample) for
+#            sample in AdvancedVI.eachsample(samples)
+#        ])
+#    values = [sample[1] for sample in fn_samples]
+#    pullbacks = [sample[2] for sample in fn_samples]
+#    function estimate_energy_with_samples_aux_pullback(ȳ)
+#        grads = [pullback(ȳ_i)[1] for (ȳ_i, pullback) in zip(ȳ, pullbacks)]
+#        ret = mean(grads)
+#        println(size(ret))
+#        println(size(samples))
+#        return (NoTangent(), NoTangent(), ret)
+#    end
+#    return mean(values), estimate_energy_with_samples_aux_pullback
+#end
+
 mutable struct SaveBestModelCallback{T}
 	best_elbo::Float64
 	best_model::T
