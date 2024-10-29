@@ -1,10 +1,14 @@
 export ABM
 
-struct ABM{P, B, L, H} <: StochasticModel{B, L}
+struct ABM{P, B, L, H, S} <: StochasticModel{B, L}
     parameters::P
     ad_backend::B
     loss::L
     gradient_horizon::H
+    summarizer::S
+end
+function ABM(; parameters, ad_backend, loss, summarizer = x -> x, gradient_horizon = Inf)
+    ABM(parameters, ad_backend, loss, gradient_horizon, summarizer)
 end
 function (abm::ABM)(params)
     _, rec_f = Flux.destructure(abm)
@@ -12,7 +16,6 @@ function (abm::ABM)(params)
 end
 Functors.@functor ABM (parameters,)
 #Flux.@layer ABM trainable=(parameters,)
-ABM(parameters, ad_backend, loss) = ABM(parameters, ad_backend, loss, Inf)
 
 function Distributions.rand(model::ABM)
     params, rec_f = Flux.destructure(model)
@@ -26,13 +29,15 @@ Distributions.rand(rng::Random.AbstractRNG, model::ABM) = rand(model)
 ## differentiation rules
 
 function diff_rand(ad_backend, rec_f, params)
-    return abm_run(rec_f(params).parameters)
+    model = rec_f(params)
+    x = abm_run(model.parameters)
+    return model.summarizer(x)
 end
 
 function ChainRulesCore.rrule(
         ::typeof(diff_rand), ad::AutoForwardDiff, rec_f, params)
     value, jacobian = DifferentiationInterface.value_and_jacobian(
-        x -> abm_run(rec_f(x).parameters), ad, params)
+        x -> diff_rand(ad, rec_f, x), ad, params)
     function diff_rand_pullback(y_tangent)
         grad = jacobian' * y_tangent[:]
         return NoTangent(), NoTangent(), NoTangent(), grad
@@ -44,11 +49,11 @@ function ChainRulesCore.rrule(
     n_samples = ad.n_samples
     st_samples = Matrix{Float64}[]
     st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(
-                             x -> abm_run(rec_f(x).parameters), params)...)
+                             x -> diff_rand(ad, rec_f, x), params)...)
                          for _ in 1:n_samples])
     #st_samples = [hcat(StochasticAD.derivative_estimate(
     #                  x -> abm_run(rec_f(x).parameters), params)...) for _ in 1:n_samples]
-    value = abm_run(rec_f(params).parameters)
+    value = diff_rand(ad, rec_f, params)
     jacobian = sum(st_samples) / n_samples
     function diff_rand_pullback(y_tangent)
         return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent[:]

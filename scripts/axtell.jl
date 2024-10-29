@@ -37,7 +37,7 @@ params_to_try = [[0.3, 0.7, 0.4, 0.5, 0.25, 1.0], [0.1, 0.2, 0.2, 0.8, 0.25, 1.0
 true_params = [[0.3, 0.7], [0.4, 0.75], 0.25, 1.0]
 true_params_flat = vcat(true_params...)
 #my_loss = MSELoss(w = 1.0, n_samples = 1)
-my_loss = GaussianMMDLoss(w = 0.1, n_samples = 8)
+my_loss = GaussianMMDLoss(w = 0.01, n_samples = 8)
 abm = ABM(make_abm_params(true_params...), AutoForwardDiff(), my_loss)
 data = sum([rand(abm(true_params_flat)) for _ in 1:10]) / 10
 fig, ax = plt.subplots(1, 3, figsize = (12, 4))
@@ -184,20 +184,23 @@ function run_vi_with_gradient_method(gradient_method)
     return q, stats, q_untrained, best_q_cb, best_q, best_elbo
 end
 q_score, stats_score, q_untrained_score, best_q_cb_score, best_q_score, best_elbo_score = run_vi_with_gradient_method("score");
-#q_pathwise, stats_pathwise, q_untrained_pathwise, best_q_cb_pathwise, best_q_pathwise, best_elbo_pathwise = run_vi_with_gradient_method("pathwise");
+q_pathwise, stats_pathwise, q_untrained_pathwise, best_q_cb_pathwise, best_q_pathwise, best_elbo_pathwise = run_vi_with_gradient_method("pathwise");
 ##
 println("best_elbo_score $(best_elbo_score)")
 println("best_elbo_pathwise $(best_elbo_pathwise)")
 elbo_pathwise = [s.elbo for s in stats_pathwise]
 elbo_score = [s.elbo for s in stats_score]
 fig, ax = plt.subplots(figsize = (6, 4))
-ax.plot(-elbo_pathwise, label = "pathwise")
-ax.plot(-elbo_score, label = "score")
+ax.plot(-elbo_pathwise, label = "Pathwise")
+ax.plot(-elbo_score, label = "Score", color = "C2")
 ax.set_yscale("log")
 best_loss = mean([logpdf(abm(true_params_flat), data) for i in 1:20])
 ax.axhline(-best_loss, color = "red")
 #ax.set_yscale("log")
-ax.legend()
+ax.legend(title="Gradient estimation method")
+ax.set_ylabel("ELBO")
+ax.set_xlabel("Epoch")
+fig.savefig("../DiffABMsPaper/figures/axtell_elbo.pdf", bbox_inches = "tight")
 fig
 
 ##
@@ -214,17 +217,17 @@ prior_samples = rand(prior, 10000)
 prior_samples[6, :] = prior_samples[6, :] .+ 0.5
 fig = pygtc.plotGTC(
     [q_samples_pathwise', q_samples_score', prior_samples'],
-    figureSize = 4, truths = vcat(true_params...),
+    figureSize = 7, truths = vcat(true_params...),
     colorsOrder = ["blues", "oranges", "grays"],
     paramNames = [L"$\theta_a$", L"$\theta_b$", L"$e_a$", L"$e_b$", L"$a$", L"$b$"],
     chainLabels = ["Pathwise", "Score", "Prior"]
 )
-fig.savefig("../DiffABMsPaper/figures/axtell_posteriors.pdf", bbox_inches = "tight")
+#fig.savefig("../DiffABMsPaper/figures/axtell_posteriors.pdf", bbox_inches = "tight")
 fig
 
 ##
 # predictive
-n_samples = 15
+n_samples = 10
 q_samples_score_plot = q_samples_score[:, 1:n_samples]
 q_samples_pathwise_plot = q_samples_pathwise[:, 1:n_samples]
 q_untrained_samples_plot = q_samples_untrained[:, 1:n_samples]

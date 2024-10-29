@@ -123,12 +123,11 @@ function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
     return PyTorchFlow(flow_py)
 end
 
-function make_masked_affine_autoregressive_flow_torch(
-        dim, n_layers, hidden_dim)
+function make_masked_affine_autoregressive_flow_torch(;dim, n_layers, n_units)
     flows = []
     for i in 1:n_layers
         push!(flows,
-            normflows.flows.MaskedAffineAutoregressive(dim, hidden_dim, num_blocks = 2))
+            normflows.flows.MaskedAffineAutoregressive(dim, n_units, num_blocks = 2))
         push!(flows, normflows.flows.LULinearPermute(dim))
     end
     q0 = normflows.distributions.DiagGaussian(dim)

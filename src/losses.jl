@@ -44,7 +44,8 @@ function Distributions.logpdf(
             loss += weights[j] * d.loss(x[j, :], y[j, :])
         end
     end
-    return -loss / d.loss.w / size(y, 1) / n_samples
+    asd = -loss / d.loss.w / size(y, 1) / n_samples
+    return asd
 end
 
 abstract type KDEKernel end
