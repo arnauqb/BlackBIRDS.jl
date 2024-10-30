@@ -31,7 +31,6 @@ Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
-NormalizingFlows = "50e4474d-9f12-44b7-af7a-91ab30ff6256"
 Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
 PProf = "e4faabce-9ead-11e9-39d9-4379958e3056"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
@@ -51,14 +50,6 @@ julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[sources.AdvancedVI]
-rev = "master"
-url = "https://github.com/arnauqb/AdvancedVI.jl"
-
-[sources.DiffSIR]
-rev = "main"
-url = "https://github.com/arnauqb/DiffSIR.jl"
 
 [targets]
 test = ["Test"]
