@@ -1,13 +1,13 @@
 export ABM
 
-struct ABM{P, B, L, H, S} <: StochasticModel{B, L}
+struct ABM{P,B,L,H,S} <: StochasticModel{B,L}
     parameters::P
     ad_backend::B
     loss::L
     gradient_horizon::H
     summarizer::S
 end
-function ABM(; parameters, ad_backend, loss, summarizer = x -> x, gradient_horizon = Inf)
+function ABM(; parameters, ad_backend, loss, summarizer=x -> x, gradient_horizon=Inf)
     ABM(parameters, ad_backend, loss, gradient_horizon, summarizer)
 end
 function (abm::ABM)(params)
@@ -35,28 +35,31 @@ function diff_rand(ad_backend, rec_f, params)
 end
 
 function ChainRulesCore.rrule(
-        ::typeof(diff_rand), ad::AutoForwardDiff, rec_f, params)
+    ::typeof(diff_rand), ad::AutoForwardDiff, rec_f, params)
     value, jacobian = DifferentiationInterface.value_and_jacobian(
         x -> diff_rand(ad, rec_f, x), ad, params)
+    n_params = length(params)
+    #jacobian = reshape(jacobian, n_params, :)'
     function diff_rand_pullback(y_tangent)
         grad = jacobian' * y_tangent[:]
         return NoTangent(), NoTangent(), NoTangent(), grad
     end
     return value, diff_rand_pullback
 end
-function ChainRulesCore.rrule(
-        ::typeof(diff_rand), ad::AutoStochasticAD, rec_f, params)
+
+function value_and_jacobian(f, ad::AutoStochasticAD, params)
     n_samples = ad.n_samples
-    st_samples = Matrix{Float64}[]
-    st_samples = fetch.([Threads.@spawn hcat(StochasticAD.derivative_estimate(
-                             x -> diff_rand(ad, rec_f, x), params)...)
-                         for _ in 1:n_samples])
-    #st_samples = [hcat(StochasticAD.derivative_estimate(
-    #                  x -> abm_run(rec_f(x).parameters), params)...) for _ in 1:n_samples]
-    value = diff_rand(ad, rec_f, params)
-    jacobian = sum(st_samples) / n_samples
+    samples = [hcat(StochasticAD.derivative_estimate(x -> f(x)[:], params)...) for _ in 1:n_samples]
+    jacobian = sum(samples) / n_samples
+    f_value = f(params)
+    return f_value, jacobian
+end
+function ChainRulesCore.rrule(
+    ::typeof(diff_rand), ad::AutoStochasticAD, rec_f, params)
+    value, jacobian = value_and_jacobian(x -> diff_rand(ad, rec_f, x), ad, params)
     function diff_rand_pullback(y_tangent)
-        return NoTangent(), NoTangent(), NoTangent(), jacobian' * y_tangent[:]
+        grad = jacobian' * y_tangent[:]
+        return NoTangent(), NoTangent(), NoTangent(), grad
     end
     return value, diff_rand_pullback
 end
@@ -81,32 +84,32 @@ end
 #    return v, rand_pullback
 #end
 
-function threaded_sampling(distribution::StochasticModel, n_samples)
-    params, f = Flux.destructure(distribution)
-    ad_backend = distribution.ad_backend
-    return threaded_sampling(f, ad_backend, params, n_samples)
-end
-
-function threaded_sampling(f, ad_backend, params, n_samples)
-    abm = f(params)
-    return fetch.([Threads.@spawn diff_rand(ad_backend, f, params) for _ in 1:n_samples])
-end
-
-function ChainRulesCore.rrule(::typeof(threaded_sampling), f, ad_backend, params, n_samples)
-    samples = fetch.([Threads.@spawn Zygote.pullback(diff_rand, ad_backend, f, params)
-                      for _ in 1:n_samples])
-    values = [samples[i][1] for i in 1:n_samples]
-    pullbacks = [samples[i][2] for i in 1:n_samples]
-
-    function threaded_sampling_pullback(ȳ)
-        ret = []
-        for i in 1:n_samples
-            y_tangent_sample = ȳ[i]
-            grad = pullbacks[i](y_tangent_sample)[3]
-            push!(ret, grad)
-        end
-        return (NoTangent(), NoTangent(), NoTangent(), sum(ret), NoTangent())
-    end
-
-    return values, threaded_sampling_pullback
-end
+#function threaded_sampling(distribution::StochasticModel, n_samples)
+#    params, f = Flux.destructure(distribution)
+#    ad_backend = distribution.ad_backend
+#    return threaded_sampling(f, ad_backend, params, n_samples)
+#end
+#
+#function threaded_sampling(f, ad_backend, params, n_samples)
+#    abm = f(params)
+#    return fetch.([Threads.@spawn diff_rand(ad_backend, f, params) for _ in 1:n_samples])
+#end
+#
+#function ChainRulesCore.rrule(::typeof(threaded_sampling), f, ad_backend, params, n_samples)
+#    samples = fetch.([Threads.@spawn Zygote.pullback(diff_rand, ad_backend, f, params)
+#                      for _ in 1:n_samples])
+#    values = [samples[i][1] for i in 1:n_samples]
+#    pullbacks = [samples[i][2] for i in 1:n_samples]
+#
+#    function threaded_sampling_pullback(ȳ)
+#        ret = []
+#        for i in 1:n_samples
+#            y_tangent_sample = ȳ[i]
+#            grad = pullbacks[i](y_tangent_sample)[3]
+#            push!(ret, grad)
+#        end
+#        return (NoTangent(), NoTangent(), NoTangent(), sum(ret), NoTangent())
+#    end
+#
+#    return values, threaded_sampling_pullback
+#end

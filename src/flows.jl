@@ -1,5 +1,8 @@
-export create_planar_flow, AffineCoupling, create_radial_flow, create_neural_spline_flow
+export create_planar_flow, AffineCoupling, create_radial_flow, create_neural_spline_flow, create_affine_coupling_flow
 using NormalizingFlows
+using Functors
+using Bijectors: partition, combine, PartitionMask
+
 
 function create_planar_flow(dim, n_layers::Int)
     q0 = MvNormal(zeros(Float32, dim))
@@ -18,15 +21,22 @@ function create_radial_flow(dim, n_layers::Int)
 end
 
 function MLP_3layer(
-        input_dim::Int, hdims::Int, output_dim::Int; activation = Flux.leakyrelu)
+    input_dim::Int, hdims::Int, output_dim::Int; activation=Flux.leakyrelu)
     return Chain(
         Flux.Dense(input_dim, hdims, activation),
         Flux.Dense(hdims, hdims, activation),
         Flux.Dense(hdims, output_dim)
     )
 end
+function mlp3(input_dim::Int, hidden_dims::Int, output_dim::Int; activation=Flux.leakyrelu)
+    return Chain(
+        Flux.Dense(input_dim, hidden_dims, activation),
+        Flux.Dense(hidden_dims, hidden_dims, activation),
+        Flux.Dense(hidden_dims, output_dim),
+    )
+end
 
-struct NeuralSplineLayer{T, A <: Flux.Chain} <: Bijectors.Bijector
+struct NeuralSplineLayer{T,A<:Flux.Chain} <: Bijectors.Bijector
     dim::Int
     K::Int
     nn::AbstractVector{A} # networks that parmaterize the knots and derivatives
@@ -35,12 +45,12 @@ struct NeuralSplineLayer{T, A <: Flux.Chain} <: Bijectors.Bijector
 end
 
 function NeuralSplineLayer(
-        dim::T1,  # dimension of input
-        hdims::T1, # dimension of hidden units for s and t
-        K::T1, # number of knots
-        B::T2, # bound of the knots
-        mask_idx::AbstractVector{<:Int} # index of dimensione that one wants to apply transformations on
-) where {T1 <: Int, T2 <: Real}
+    dim::T1,  # dimension of input
+    hdims::T1, # dimension of hidden units for s and t
+    K::T1, # number of knots
+    B::T2, # bound of the knots
+    mask_idx::AbstractVector{<:Int} # index of dimensione that one wants to apply transformations on
+) where {T1<:Int,T2<:Real}
     num_of_transformed_dims = length(mask_idx)
     input_dims = dim - num_of_transformed_dims
     nn = fill(MLP_3layer(input_dims, hdims, 3K - 1), num_of_transformed_dims)
@@ -56,8 +66,8 @@ function instantiate_rqs(nsl::NeuralSplineLayer, x::AbstractVector)
     T = permutedims(reduce(hcat, map(nn -> nn(x), nsl.nn)))
     K, B = nsl.K, nsl.B
     ws = T[:, 1:K]
-    hs = T[:, (K + 1):(2K)]
-    ds = T[:, (2K + 1):(3K - 1)]
+    hs = T[:, (K+1):(2K)]
+    ds = T[:, (2K+1):(3K-1)]
     return Bijectors.RationalQuadraticSpline(ws, hs, ds, B)
 end
 
@@ -104,7 +114,7 @@ function Bijectors.with_logabsdet_jacobian(nsl::NeuralSplineLayer, x::AbstractVe
     return Bijectors.combine(nsl.mask, y_1, x_2, x_3), logjac
 end
 
-function create_neural_spline_flow(dim; n_layers = 2, hdims = 10, K = 8, B = 3)
+function create_neural_spline_flow(dim; n_layers=2, hdims=10, K=8, B=3)
     q0 = MvNormal(zeros(Float32, dim))
     Ls = [NeuralSplineLayer(dim, hdims, K, B, [1]) ∘
           NeuralSplineLayer(dim, hdims, K, B, [2]) for
@@ -114,10 +124,10 @@ function create_neural_spline_flow(dim; n_layers = 2, hdims = 10, K = 8, B = 3)
     return flow
 end
 
-## AFFINE
-"""
-Affinecoupling layer 
-"""
+## Real NVP
+##################################
+# define affine coupling layer using Bijectors.jl interface
+#################################
 struct AffineCoupling <: Bijectors.Bijector
     dim::Int
     mask::Bijectors.PartitionMask
@@ -126,25 +136,19 @@ struct AffineCoupling <: Bijectors.Bijector
 end
 
 # let params track field s and t
-Functors.@functor AffineCoupling (s, t)
+@functor AffineCoupling (s, t)
 
 function AffineCoupling(
-        dim::Int,  # dimension of input
-        hdims::Int, # dimension of hidden units for s and t
-        mask_idx::AbstractVector # index of dimensione that one wants to apply transformations on
+    dim::Int,  # dimension of input
+    hdims::Int, # dimension of hidden units for s and t
+    mask_idx::AbstractVector, # index of dimensione that one wants to apply transformations on
 )
     cdims = length(mask_idx) # dimension of parts used to construct coupling law
-    s = MLP_3layer(cdims, hdims, cdims)
-    t = MLP_3layer(cdims, hdims, cdims)
+    input_dims = dim - cdims # dimension of the input to the neural networks
+    s = mlp3(input_dims, hdims, cdims)
+    t = mlp3(input_dims, hdims, cdims)
     mask = PartitionMask(dim, mask_idx)
     return AffineCoupling(dim, mask, s, t)
-end
-
-function Bijectors.transform(af::AffineCoupling, x::AbstractVector)
-    # partition vector using 'af.mask::PartitionMask`
-    x₁, x₂, x₃ = partition(af.mask, x)
-    y₁ = x₁ .* af.s(x₂) .+ af.t(x₂)
-    return combine(af.mask, y₁, x₂, x₃)
 end
 
 function (af::AffineCoupling)(x::AbstractArray)
@@ -154,31 +158,56 @@ end
 function Bijectors.with_logabsdet_jacobian(af::AffineCoupling, x::AbstractVector)
     x_1, x_2, x_3 = Bijectors.partition(af.mask, x)
     y_1 = af.s(x_2) .* x_1 .+ af.t(x_2)
-    logjac = sum(log ∘ abs, af.s(x_2))
-    return combine(af.mask, y_1, x_2, x_3), logjac
+    logjac = sum(log ∘ abs, af.s(x_2)) # this is a scalar
+    return Bijectors.combine(af.mask, y_1, x_2, x_3), logjac
 end
 
+function Bijectors.with_logabsdet_jacobian(af::AffineCoupling, x::AbstractMatrix)
+    x_1, x_2, x_3 = Bijectors.partition(af.mask, x)
+    y_1 = af.s(x_2) .* x_1 .+ af.t(x_2)
+    logjac = sum(log ∘ abs, af.s(x_2); dims=1) # 1 × size(x, 2)
+    return Bijectors.combine(af.mask, y_1, x_2, x_3), vec(logjac)
+end
+
+
 function Bijectors.with_logabsdet_jacobian(
-        iaf::Inverse{<:AffineCoupling}, y::AbstractVector
+    iaf::Inverse{<:AffineCoupling}, y::AbstractVector
 )
     af = iaf.orig
     # partition vector using `af.mask::PartitionMask`
-    y_1, y_2, y_3 = Bijectors.partition(af.mask, y)
+    y_1, y_2, y_3 = partition(af.mask, y)
     # inverse transformation
     x_1 = (y_1 .- af.t(y_2)) ./ af.s(y_2)
     logjac = -sum(log ∘ abs, af.s(y_2))
-    return combine(af.mask, x_1, y_2, y_3), logjac
+    return Bijectors.combine(af.mask, x_1, y_2, y_3), logjac
 end
 
-function Bijectors.logabsdetjac(af::AffineCoupling, x::AbstractVector)
-    x_1, x_2, x_3 = partition(af.mask, x)
-    logjac = sum(log ∘ abs, af.s(x_2))
-    return logjac
+function Bijectors.with_logabsdet_jacobian(
+    iaf::Inverse{<:AffineCoupling}, y::AbstractMatrix
+)
+    af = iaf.orig
+    # partition vector using `af.mask::PartitionMask`
+    y_1, y_2, y_3 = partition(af.mask, y)
+    # inverse transformation
+    x_1 = (y_1 .- af.t(y_2)) ./ af.s(y_2)
+    logjac = -sum(log ∘ abs, af.s(y_2); dims=1)
+    return Bijectors.combine(af.mask, x_1, y_2, y_3), vec(logjac)
+end
+
+function create_flow(Ls, q₀)
+    ts =  reduce(∘, Ls)
+    return transformed(q₀, ts)
 end
 
 function create_affine_coupling_flow(dim; nlayers=2)
     hdims = 20
-    Ls = [AffineCoupling(dim, hdims, [1]) ∘ AffineCoupling(dim, hdims, [2]) for i in 1:nlayers]
+    # Create a sequence of coupling layers that transform each dimension in sequence
+    Ls = []
+    for i in 1:nlayers
+        # For each layer, create a sequence of coupling layers that transform each dimension
+        layer = reduce(∘, [AffineCoupling(dim, hdims, [j]) for j in 1:dim])
+        push!(Ls, layer)
+    end
     q0 = MvNormal(zeros(Float32, dim), I)
     flow = create_flow(Ls, q0)
     return flow

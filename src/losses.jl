@@ -1,7 +1,7 @@
-export MSELoss, RelativeMSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel,
-       MMDKernel, CustomLoss, hausdorff_distance, AbstractLoss
+export MSELoss, RelativeMSELoss, KDELoss, LLLoss, GaussianMMDLoss, GaussianKernel, LogMSELoss,
+       MMDKernel, CustomLoss, hausdorff_distance, AbstractLoss, PriorLoss
 
-using Distances, LinearAlgebra
+using Distances, LinearAlgebra, KernelFunctions
 
 abstract type AbstractLoss end
 
@@ -14,21 +14,17 @@ struct CustomLoss <: AbstractLoss
     n_samples::Int64
 end
 function MSELoss(; w=1.0, n_samples=1, weights = [1.0])
-    CustomLoss((x, y) -> sum((x - y) .^ 2) / length(y), weights, w, n_samples)
+    CustomLoss((x, y) -> sum((x - y) .^ 2), weights, w, n_samples)
+end
+function LogMSELoss(; w=1.0, n_samples=1, weights = [1.0])
+    CustomLoss((x, y) -> sum((log.(x .+ 1e-8) - log.(y .+ 1e-8)) .^ 2), weights, w, n_samples)
 end
 function RelativeMSELoss(; w=1.0, n_samples=1, weights = [1.0])
-    CustomLoss((x, y) -> sum((x - y) .^ 2 ./ (y .^ 2)) / length(y), weights, w, n_samples)
+    CustomLoss((x, y) -> sum((x - y) .^ 2 ./ (y .^ 2)), weights, w, n_samples)
 end
 function (loss::CustomLoss)(x, y)
     return loss.loss(x, y)
 end
-
-#function Distributions.logpdf(
-#        d::StochasticModel{B, L}, y::AbstractVector{<:Real}) where {B, L <: CustomLoss}
-#    n_samples = d.loss.n_samples
-#    x = [rand(d) for _ in 1:n_samples]
-#    return -mean([d.loss(x[i], y) for i in 1:n_samples]) / d.loss.w
-#end
 
 function Distributions.logpdf(
         d::StochasticModel{B, L}, y::AbstractMatrix{<:Real}) where {B, L <: CustomLoss}
@@ -36,16 +32,14 @@ function Distributions.logpdf(
     n_samples = d.loss.n_samples
     weights = d.loss.weights
     loss = 0.0
-    xs = threaded_sampling(d, n_samples)
-    #xs = [rand(d) for _ in 1:(d.loss.n_samples)]
+    xs = [rand(d) for _ in 1:(d.loss.n_samples)]
     for i in 1:n_samples
         x = xs[i]
         for j in axes(x, 1)
             loss += weights[j] * d.loss(x[j, :], y[j, :])
         end
     end
-    asd = -loss / d.loss.w / size(y, 1) / n_samples
-    return asd
+    return -loss / d.loss.w / size(y, 1) / n_samples
 end
 
 abstract type KDEKernel end
@@ -144,25 +138,109 @@ end
 
 Shape expected is (n_features, n_timesteps)
 """
+
 struct GaussianMMDLoss <: AbstractLoss
     w::Float64
     n_samples::Int64
 end
 GaussianMMDLoss(;w=1.0, n_samples=2) = GaussianMMDLoss(w, n_samples)
 
-function mmd_estimate_sigma(y::AbstractMatrix{T}) where {T}
-    sigmas = T[]
-    for i in axes(y, 1)
-        distances = pairwise(Euclidean(), y[i, :], y[i, :])
-        push!(sigmas, median(distances))
+#function mmd_estimate_sigma(y::AbstractMatrix{T}) where {T}
+#    """
+#    Estimates the bandwidth of the Gaussian kernel for each feature using the 
+#        median heuristic.
+#    """
+#    sigmas = T[]
+#    for i in axes(y, 1)
+#        distances = sqrt.(pairwise(Euclidean(), y[i, :], y[i, :]))
+#        push!(sigmas, median(distances))
+#    end
+#    return sigmas
+#end
+#
+#function gaussian_kernel(x, y, sigmas)
+#    covariance = Diagonal(sigmas .^ 2)
+#    distances = [norm(x[i, :] - y[i, :]) for i in axes(x, 1)]
+#    return exp(logpdf(MvNormal(zeros(length(sigmas)), covariance), distances))
+#end
+#
+#
+#function Distributions.logpdf(
+#        d::StochasticModel{B, L}, y::AbstractArray{<:Real, M}) where {
+#        B, L <: GaussianMMDLoss, M}
+#    n_samples = d.loss.n_samples
+#    if n_samples < 2
+#        throw(ArgumentError("n_samples must be at least 2."))
+#    end
+#    xs = [rand(d) for _ in 1:(d.loss.n_samples)]
+#    sigmas = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(y))
+#    iterator = 1:n_samples
+#    # kxx is the mean of the kernel between each sample except with itself
+#    kxx = mean([gaussian_kernel(xs[i], xs[j], sigmas)
+#                for i in iterator, j in iterator if i != j])
+#    # kyy is the mean of the kernel between each sample and itself
+#    kyy = mean([gaussian_kernel(xs[i], xs[j], sigmas)
+#                for i in iterator, j in iterator if i != j])
+#    # kxy is the mean of the kernel between each sample and the target
+#    kxy = mean([gaussian_kernel(xs[i], y, sigmas) for i in iterator])
+#    mmd_loss = kxx + kyy - 2 * kxy
+#    return -mmd_loss / d.loss.w / size(y, 2)
+#end
+
+function mmd_estimate_sigma(Y::AbstractVector{<:AbstractMatrix})
+    # Y is a vector of C×T matrices (observed or pooled samples)
+    C = size(first(Y), 1)
+    sigmas = Float64[]
+
+    for c in 1:C
+        d = Float64[]
+        for i in 1:length(Y)-1, j in i+1:length(Y)
+            # L² distance along the time axis for channel c
+            push!(d, norm(Y[i][c, :] .- Y[j][c, :]))
+        end
+        push!(sigmas, median(d) + eps())   # guard against σ = 0
     end
-    return sigmas
+    return sigmas                          # length C
 end
 
-function gaussian_kernel(x, y, sigmas)
-    covariance = Diagonal(sigmas)
-    distances = [norm(x[i, :] - y[i, :]) for i in axes(x, 1)]
-    return logpdf(MvNormal(zeros(length(sigmas)), covariance), distances)
+@inline function gaussian_kernel(X::AbstractMatrix,
+    Y::AbstractMatrix,
+    σ::AbstractVector)      # one per channel
+    @assert size(X) == size(Y) "Shapes must agree"
+    C = length(σ)
+    s2 = 0.0
+    for c in 1:C
+        diff = X[c, :] .- Y[c, :]
+        s2  += sum(abs2, diff) / σ[c]^2
+    end
+    return exp(-0.5*s2)
+end
+
+
+function conditional_mmd(xs::Vector{<:AbstractMatrix},    # simulator reps
+    ys::Vector{<:AbstractMatrix})    # observed reps
+    σ = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(vcat(xs, ys))                  # adaptive bandwidth
+    n, m = length(xs), length(ys)
+
+    kxx = kyy = kxy = 0.0
+
+    for i in 1:n-1, j in i+1:n
+        kxx += gaussian_kernel(xs[i], xs[j], σ)
+    end
+    kxx *= 2 / (n*(n-1))
+
+    #for i in 1:m-1, j in i+1:m
+    #    kyy += gaussian_kernel(ys[i], ys[j], σ)
+    #end
+    #kyy *= 2 / (m*(m-1))
+    kyy = 0.0
+
+    for i in 1:n, j in 1:m
+        kxy += gaussian_kernel(xs[i], ys[j], σ)
+    end
+    kxy *= 2 / (n*m)
+
+    return kxx + kyy - kxy
 end
 
 function Distributions.logpdf(
@@ -172,20 +250,7 @@ function Distributions.logpdf(
     if n_samples < 2
         throw(ArgumentError("n_samples must be at least 2."))
     end
-    # This is broken in Zygote!!
-    xs = threaded_sampling(d, n_samples)
-    #xs = fetch.([Threads.@spawn rand(d) for _ in 1:(d.loss.n_samples)])
-    #xs = [rand(d) for _ in 1:(d.loss.n_samples)]
-    sigmas = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(y))
-    iterator = 1:n_samples
-    # kxx is the mean of the kernel between each sample except with itself
-    kxx = mean([gaussian_kernel(xs[i], xs[j], sigmas)
-                for i in iterator, j in iterator if i != j])
-    # kyy is the mean of the kernel between each sample and itself
-    kyy = mean([gaussian_kernel(xs[i], xs[j], sigmas)
-                for i in iterator, j in iterator if i != j])
-    # kxy is the mean of the kernel between each sample and the target
-    kxy = mean([gaussian_kernel(xs[i], y, sigmas) for i in iterator])
-    mmd_loss = kxx + kyy - 2 * kxy
+    xs = [rand(d) for _ in 1:(d.loss.n_samples)]
+    mmd_loss = conditional_mmd(xs, [y])
     return -mmd_loss / d.loss.w / size(y, 2)
 end

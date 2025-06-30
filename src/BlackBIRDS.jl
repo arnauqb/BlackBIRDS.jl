@@ -11,6 +11,7 @@ using DiffABM # TODO: make an extension
 using Flux
 import DifferentiationInterface
 using DiffResults
+using Infiltrator
 using Distributions
 import DistributionsAD
 import DynamicPPL
@@ -20,6 +21,7 @@ import LogDensityProblems
 using LinearAlgebra
 import Optimisers
 using SimpleUnPack
+using ProgressMeter
 import StochasticAD
 using Random
 import Zygote
@@ -44,7 +46,7 @@ abstract type StochasticModel{B, L} <: Distributions.ContinuousMatrixDistributio
 include("utils.jl")
 include("diff.jl")
 include("losses.jl")
-#include("flows.jl")
+include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
 include("test_gradients.jl")

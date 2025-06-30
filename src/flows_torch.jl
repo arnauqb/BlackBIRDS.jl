@@ -108,12 +108,19 @@ function make_real_nvp_flow_torch(dim, n_layers, hidden_dim)
     for i in 1:n_layers
         # Neural network with two hidden layers having 64 units each
         # Last layer is initialized by zeros making training more stable
-        param_map = normflows.nets.MLP(
-            [Int(dim / 2), hidden_dim, hidden_dim, dim], init_zeros=true)
+        if i % 2 == 1
+            split_dim = n_dims ÷ 2
+        else
+            split_dim = (n_dims + 1) ÷ 2
+        end
+        input_dim = split_dim
+        output_dim = 2 * (n_dims - split_dim)
+
+        param_map = normflows.nets.MLP([input_dim, hidden_dim, hidden_dim, output_dim], init_zeros=True)
         # Add flow layer
         push!(flows, normflows.flows.AffineCouplingBlock(param_map))
         # Swap dimensions
-        push!(flows, normflows.flows.Permute(dim, mode="swap"))
+        push!(flows, normflows.flows.Permute(dim, mode="shuffle"))
     end
     base = normflows.distributions.base.DiagGaussian(dim)
     # Construct flow model
@@ -186,9 +193,12 @@ end
 
 
 function serialize_flow(
-    flow::MultivariateTransformed{<:PyTorchFlow}, hyper_parameters, function_call)
+    flow, hyper_parameters, function_call)
     transform = flow.transform
-    flow_parameters = flow.dist.params_flat
+    if !hasproperty(flow.dist, :params_flat)
+        dict = Dict(:transform => transform, :location => flow.dist.location, :scale => flow.dist.scale)
+        return dict
+    end
     buffers_arrays = [b.numpy() for b in flow.dist.buffers]
     params_arrays = [p.numpy() for p in flow.dist.params]
     dict = Dict(:transform => transform, :params_flat => flow.dist.params_flat,
@@ -197,12 +207,18 @@ function serialize_flow(
     return dict
 end
 
+function serialize_flow(flow::MvLocationScale, hyper_parameters, function_call)
+end
+
 function save_flow(serialized_dict, path)
     serialize(path, serialized_dict)
 end
 
 function deserialize_flow(flow_serialized::Dict)
     transform = flow_serialized[:transform]
+    if haskey(flow_serialized, :location)
+        return transformed(AdvancedVI.MeanFieldGaussian(flow_serialized[:location], flow_serialized[:scale]), transform)
+    end
     params = flow_serialized[:params]
     params = tuple([torch.tensor(p, dtype=torch.float) for p in params]...)
     params_flat = flow_serialized[:params_flat]
