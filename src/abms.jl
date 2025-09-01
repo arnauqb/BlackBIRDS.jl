@@ -15,16 +15,12 @@ function (abm::ABM)(params)
     return rec_f(params)
 end
 Functors.@functor ABM (parameters,)
-#Flux.@layer ABM trainable=(parameters,)
 
 function Distributions.rand(model::ABM)
     params, rec_f = Flux.destructure(model)
     return diff_rand(model.ad_backend, rec_f, params)
 end
 Distributions.rand(rng::Random.AbstractRNG, model::ABM) = rand(model)
-#function Distributions.logpdf(model::ABM{P, B, L, H}, y) where {P, B, L <: AbstractLoss, H}
-#    throw("Loss $L for model $model not implemented")
-#end
 
 ## differentiation rules
 
@@ -63,53 +59,3 @@ function ChainRulesCore.rrule(
     end
     return value, diff_rand_pullback
 end
-
-#non_zygote_backends = Union{AutoStochasticAD, AutoForwardDiff}
-#function ChainRulesCore.rrule(
-#        ::typeof(rand), model::ABM{P, B, L, H}) where {P, B <: non_zygote_backends, L, H}
-#    v, jacobians = value_and_gradient(model.ad_backend, model)
-#    function rand_pullback(y_tangent)
-#        rand_tangent = NoTangent()
-#        grad = jacobians' * y_tangent
-#        p_grads = Dict{Symbol, Vector{eltype(grad[1])}}()
-#        counter = 1
-#        for (key, p) in pairs(Flux.trainable(model.parameters))
-#            p_grads[key] = grad[counter:(counter + length(p) - 1)]
-#            counter += length(p)
-#        end
-#        params_tangent = Tangent{P}(; p_grads...)
-#        model_tangent = Tangent{ABM{P, B, L, H}}(; parameters = params_tangent)
-#        return rand_tangent, model_tangent
-#    end
-#    return v, rand_pullback
-#end
-
-#function threaded_sampling(distribution::StochasticModel, n_samples)
-#    params, f = Flux.destructure(distribution)
-#    ad_backend = distribution.ad_backend
-#    return threaded_sampling(f, ad_backend, params, n_samples)
-#end
-#
-#function threaded_sampling(f, ad_backend, params, n_samples)
-#    abm = f(params)
-#    return fetch.([Threads.@spawn diff_rand(ad_backend, f, params) for _ in 1:n_samples])
-#end
-#
-#function ChainRulesCore.rrule(::typeof(threaded_sampling), f, ad_backend, params, n_samples)
-#    samples = fetch.([Threads.@spawn Zygote.pullback(diff_rand, ad_backend, f, params)
-#                      for _ in 1:n_samples])
-#    values = [samples[i][1] for i in 1:n_samples]
-#    pullbacks = [samples[i][2] for i in 1:n_samples]
-#
-#    function threaded_sampling_pullback(ȳ)
-#        ret = []
-#        for i in 1:n_samples
-#            y_tangent_sample = ȳ[i]
-#            grad = pullbacks[i](y_tangent_sample)[3]
-#            push!(ret, grad)
-#        end
-#        return (NoTangent(), NoTangent(), NoTangent(), sum(ret), NoTangent())
-#    end
-#
-#    return values, threaded_sampling_pullback
-#end
