@@ -145,47 +145,6 @@ struct GaussianMMDLoss <: AbstractLoss
 end
 GaussianMMDLoss(;w=1.0, n_samples=2) = GaussianMMDLoss(w, n_samples)
 
-#function mmd_estimate_sigma(y::AbstractMatrix{T}) where {T}
-#    """
-#    Estimates the bandwidth of the Gaussian kernel for each feature using the 
-#        median heuristic.
-#    """
-#    sigmas = T[]
-#    for i in axes(y, 1)
-#        distances = sqrt.(pairwise(Euclidean(), y[i, :], y[i, :]))
-#        push!(sigmas, median(distances))
-#    end
-#    return sigmas
-#end
-#
-#function gaussian_kernel(x, y, sigmas)
-#    covariance = Diagonal(sigmas .^ 2)
-#    distances = [norm(x[i, :] - y[i, :]) for i in axes(x, 1)]
-#    return exp(logpdf(MvNormal(zeros(length(sigmas)), covariance), distances))
-#end
-#
-#
-#function Distributions.logpdf(
-#        d::StochasticModel{B, L}, y::AbstractArray{<:Real, M}) where {
-#        B, L <: GaussianMMDLoss, M}
-#    n_samples = d.loss.n_samples
-#    if n_samples < 2
-#        throw(ArgumentError("n_samples must be at least 2."))
-#    end
-#    xs = [rand(d) for _ in 1:(d.loss.n_samples)]
-#    sigmas = ChainRulesCore.@ignore_derivatives mmd_estimate_sigma(DiffABM.ignore_gradient.(y))
-#    iterator = 1:n_samples
-#    # kxx is the mean of the kernel between each sample except with itself
-#    kxx = mean([gaussian_kernel(xs[i], xs[j], sigmas)
-#                for i in iterator, j in iterator if i != j])
-#    # kyy is the mean of the kernel between each sample and itself
-#    kyy = mean([gaussian_kernel(xs[i], xs[j], sigmas)
-#                for i in iterator, j in iterator if i != j])
-#    # kxy is the mean of the kernel between each sample and the target
-#    kxy = mean([gaussian_kernel(xs[i], y, sigmas) for i in iterator])
-#    mmd_loss = kxx + kyy - 2 * kxy
-#    return -mmd_loss / d.loss.w / size(y, 2)
-#end
 
 function mmd_estimate_sigma(Y::AbstractVector{<:AbstractMatrix})
     # Y is a vector of C×T matrices (observed or pooled samples)
@@ -229,6 +188,7 @@ function conditional_mmd(xs::Vector{<:AbstractMatrix},    # simulator reps
     end
     kxx *= 2 / (n*(n-1))
 
+    # kky is 0 for our purposes since we calibrate to one sample
     #for i in 1:m-1, j in i+1:m
     #    kyy += gaussian_kernel(ys[i], ys[j], σ)
     #end
