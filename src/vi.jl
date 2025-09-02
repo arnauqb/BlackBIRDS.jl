@@ -42,11 +42,9 @@ function run_vi(;
     entropy_estimation=AdvancedVI.ClosedFormEntropy(),
     transform="auto",
     maximize_initial_entropy=false,
-    prior=nothing,
     init_entropy_n_iters=100,
     init_entropy_n_samples_per_iter=10,
     init_entropy_lr=1e-3,
-    patience=nothing,
 )
     if transform == "auto"
         bijector_transf = inverse(bijector(model))
@@ -84,7 +82,6 @@ function run_vi(;
         adtype,
         optimizer=optimizer,
         callback=best_model_callback,
-        patience=patience,
     )
     return q, stats, q_untrained, best_model_callback
 end

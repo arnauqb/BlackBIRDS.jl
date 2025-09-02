@@ -30,6 +30,7 @@ Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
 PProf = "e4faabce-9ead-11e9-39d9-4379958e3056"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+PyTorchNormalizingFlows = "b1ce68fd-cc19-4df3-b5ec-a7d53c0ea107"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleUnPack = "ce78b400-467f-4804-87d8-8f486da07d0a"
 StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
@@ -38,9 +39,11 @@ StochasticAD = "e4facb34-4f7e-4bec-b153-e122c37934ac"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+AdvancedVI = "0.4.1"
 KernelFunctions = "0.10.65"
 NormalizingFlows = "0.2.0"
 ProgressMeter = "1.10.2"
+PyTorchNormalizingFlows = "1.0.0"
 julia = "1.10"
 
 [extras]

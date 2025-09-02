@@ -7,11 +7,10 @@ using AdvancedVI
 using AdvancedHMC
 using Bijectors
 using ChainRulesCore
-using DiffABM # TODO: make an extension
+using DiffABM 
 using Flux
 import DifferentiationInterface
 using DiffResults
-using Infiltrator
 using Distributions
 import DistributionsAD
 import DynamicPPL
@@ -49,7 +48,6 @@ include("losses.jl")
 include("flows.jl")
 include("flows_torch.jl")
 include("vi.jl")
-include("test_gradients.jl")
 include("hmc.jl")
 include("abms.jl")
 
