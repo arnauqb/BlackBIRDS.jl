@@ -6,7 +6,7 @@ using DiffABM
 using PyPlot
 using Zygote
 using ForwardDiff
-#using PyTorchNormalizingFlows
+using PyTorchNormalizingFlows
 using Optimisers
 
 
@@ -14,7 +14,7 @@ using Optimisers
 rw = DiffABM.RandomWalkParams(100, ST(), [0.2]) # Use Straight-Through Estimator
 
 # use autoforwarddiff to diff, use MSELoss as likelihood 
-model = ABM(parameters=rw, ad_backend=AutoZygote(), loss=MSELoss(w=2.0))
+model = ABM(parameters=rw, ad_backend=AutoForwardDiff(), loss=MSELoss(w=1.0))
 
 # generate data
 y_obs = rand(model)
@@ -61,8 +61,8 @@ flow_samples = rand(flow_trained, 5000)
 untrained_samples = rand(flow_untrained, 5000)
 
 fig, ax = plt.subplots()
-ax.hist(flow_samples[1,:], label="trained", alpha=0.5, bins=100)
-ax.hist(untrained_samples[1,:], label="untrained", alpha=0.5, bins=100)
+ax.hist(flow_samples[1,:], label="trained", alpha=0.5, bins=50, density=true)
+ax.hist(untrained_samples[1,:], label="untrained", alpha=0.5, bins=50, density=true)
 ax.legend()
 ax.axvline(0.2, color="red")
 fig.savefig("img/flow_samples.png")

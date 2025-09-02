@@ -8,6 +8,7 @@ BlackBIRDS enables parameter inference for ABMs by:
 - Using differentiable ABM simulations via DiffABM
 - Training normalizing flows as variational approximations 
 - Supporting various gradient estimation methods for variational inference
+- Supporting hybrid-mode autodifferentiation (forward/reverse for ABMs, reverse for posterior estimation) to enable deep ABM calibration.
 
 ## Installation
 
@@ -17,6 +18,8 @@ Pkg.add(url="https://github.com/arnauqb/BlackBIRDS.jl")
 ```
 
 ## Usage Example: Random Walk Calibration
+
+You can find the example in `scripts`. 
 
 This example shows how to calibrate parameters of a random walk ABM using variational inference with normalizing flows.
 
@@ -32,6 +35,7 @@ using PyPlot
 using Zygote
 using ForwardDiff
 using Optimisers
+using PyTorchNormalizingFlows
 ```
 
 ### 1. Initialize Model Parameters
@@ -41,7 +45,8 @@ using Optimisers
 rw = DiffABM.RandomWalkParams(100, ST(), [0.2]) # Use Straight-Through Estimator
 
 # Configure ABM with automatic differentiation backend and loss function
-model = ABM(parameters=rw, ad_backend=AutoZygote(), loss=MSELoss(w=2.0))
+# w is the weight in the GVI loss (high w -> more importance to prior)
+model = ABM(parameters=rw, ad_backend=AutoForwardDiff(), loss=MSELoss(w=1.0))
 
 # Generate synthetic observation data
 y_obs = rand(model)
@@ -103,8 +108,8 @@ untrained_samples = rand(flow_untrained, 5000)
 
 # Compare posterior samples
 fig, ax = plt.subplots()
-ax.hist(flow_samples[1,:], label="trained", alpha=0.5, bins=100)
-ax.hist(untrained_samples[1,:], label="untrained", alpha=0.5, bins=100)
+ax.hist(flow_samples[1,:], label="trained", alpha=0.5, bins=50, density=true)
+ax.hist(untrained_samples[1,:], label="untrained", alpha=0.5, bins=50, density=true)
 ax.legend()
 ax.axvline(0.2, color="red")  # True parameter value
 fig.savefig("img/flow_samples.png")

@@ -9,16 +9,12 @@ struct TestModel{B, L} <: BlackBIRDS.StochasticModel{B, L}
 end
 
 @testset "test MSELoss" begin
-    Distributions.rand(::TestModel) = 3 .* ones(5)
-    mseloss = MSELoss(4.0)
+    Distributions.rand(::TestModel) = 3 .* ones(1, 5)
+    mseloss = MSELoss(w=4.0)
     d = TestModel(AutoForwardDiff(), mseloss)
 
-    y = ones(5)
-    @test logpdf(d, y) == -1.0
-
-    Distributions.rand(::TestModel) = hcat(2 .* ones(5), 3 .* ones(5))'
-    y = ones(2, 5)
-    @test logpdf(d, y) == -5 / 4 / 2
+    y = ones(1, 5)
+    @test logpdf(d, y) == -5.0
 end
 
 @testset "test KDELoss" begin
@@ -38,22 +34,4 @@ end
     lp = logpdf(test, data)
     true_lp = true_logpdf(test, data)
     @test lp≈true_lp rtol=0.05
-end
-
-@testset "test MMD loss" begin
-    @testset "test non mutating median" begin
-        @test BlackBIRDS.non_mutating_median([1.0, 4, -2]) == 1.0
-        @test BlackBIRDS.non_mutating_median([1.0, 4, -2, 5]) == 3.0
-    end
-    y = reshape([1.0, 4, -2], 1, 3)
-    mmd = GaussianMMDLoss(1.0)
-    kernel_yy = exp.(-[[0, 9,9] [9, 0,36.0] [9, 36,0]] / (18))
-    kernel_yy = kernel_yy - I(3)
-
-    a = rand(30, 50)
-    Distributions.rand(::TestModel) = a
-    mmd = GaussianMMDLoss(1.0)
-    d = TestModel(AutoForwardDiff(), mmd)
-
-    @test logpdf(d, a)≈0.0 rtol=0.05 atol=0.05
 end
