@@ -1,3 +1,6 @@
+> [!CAUTION]
+> This is still very much an experimental package
+> 
 # BlackBIRDS.jl
 
 A Julia package for Bayesian inference using normalizing flows with Agent-Based Models (ABMs), combining variational inference with differentiable ABM simulations.
